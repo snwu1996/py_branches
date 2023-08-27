@@ -76,18 +76,23 @@ def test_activate_decorator_single():
     # Test activated behavior
     py_trees.tests.tick_tree(root, 1, 1, visitor, print_snapshot=True)
     print("\n--------- Single Behavior - Activated ---------")
-    assert guarded_behavior.initialised == True
-    assert guarded_behavior.updated == True
-    assert guarded_behavior.status == py_trees.Status.SUCCESS
+    check_guarded_behavior(guarded_behavior, True, True, py_trees.Status.SUCCESS)
+    assert activate_guarded_behavior.status == py_trees.Status.SUCCESS
 
     # Test deactivated behavior
     activate_guarded_behavior.activate = False
     guarded_behavior.reset()
     py_trees.tests.tick_tree(root, 2, 2, visitor, print_snapshot=True)
     print("\n--------- Single Behavior - Deactivated ---------")
-    assert guarded_behavior.initialised == False
-    assert guarded_behavior.updated == False
-    assert guarded_behavior.status == py_trees.Status.INVALID
+    check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
+    assert activate_guarded_behavior.status == py_trees.Status.FAILURE
+
+    activate_guarded_behavior._always_success = True
+    guarded_behavior.reset()
+    py_trees.tests.tick_tree(root, 3, 3, visitor, print_snapshot=True)
+    print("\n--------- Single Behavior - Always Success ---------")
+    check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
+    assert activate_guarded_behavior.status == py_trees.Status.SUCCESS
 
 def test_activate_decorator_multiple():
     print(console.bold + 'test_activate_decorator_multiple')
@@ -161,6 +166,18 @@ def test_run_every_x_decorator():
         else:
             check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
             assert run_every_x_guarded_behavior.status == py_trees.Status.FAILURE
+
+    print("\n--------- Run Every X - Always Success ---------")
+    run_every_x_guarded_behavior._always_success = True
+    for i in range(2*every_x_range[0]):
+        guarded_behavior.reset()
+        py_trees.tests.tick_tree(root, i, i, visitor, print_snapshot=True)
+        if (i+1)%every_x_range[0] == 0:
+            check_guarded_behavior(guarded_behavior, True, True, py_trees.Status.SUCCESS)
+        else:
+            check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
+        assert run_every_x_guarded_behavior.status == py_trees.Status.SUCCESS
+    run_every_x_guarded_behavior._always_success = False
 
     print("\n--------- Run Every X - Random ---------")
     run_every_x_guarded_behavior._every_x_range = (1,5)

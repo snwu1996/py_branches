@@ -15,9 +15,10 @@ class ActivateBehavior(py_trees.decorators.Decorator):
         child(Behavior): The child behavior that is being activated or not activated.
         name(str): Name of this behavior
     '''
-    def __init__(self, child, name: str, activate: bool):
+    def __init__(self, child, name: str, activate: bool, always_success:bool=False):
         super(ActivateBehavior, self).__init__(name=name, child=child)
         self._activate = activate
+        self._always_success = always_success
 
     @property
     def activate(self):
@@ -29,7 +30,10 @@ class ActivateBehavior(py_trees.decorators.Decorator):
 
     def tick(self):
         if not self._activate:
-            self.stop(py_trees.Status.FAILURE)
+            if self._always_success:
+                self.stop(py_trees.Status.SUCCESS)
+            else:
+                self.stop(py_trees.Status.FAILURE)
             yield self
         else:
             for node in super().tick():
@@ -96,7 +100,7 @@ class RunEveryX(py_trees.decorators.Decorator):
             (1,5) then the child behavior will run randomly between every
                 cycle or every 5th cycle. Changes every times it child gets executed.
     '''
-    def __init__(self, child, name: str, every_x_range: Tuple[int, int]):
+    def __init__(self, child, name: str, every_x_range: Tuple[int, int], always_success:bool=False):
         assert every_x_range[0] <= every_x_range[1], \
             'every_x_range must be a tuple with (smaller_number, bigger_number)'
         assert every_x_range[0] > 0, 'Can not have range be lower than 1.'
@@ -104,6 +108,7 @@ class RunEveryX(py_trees.decorators.Decorator):
         super(RunEveryX, self).__init__(name=name, child=child)
         self._every_x_range = every_x_range
         self._cycles_remaining = random.randint(*self._every_x_range)-1
+        self._always_success = always_success
 
     def initialise(self):
         self._cycles_remaining = random.randint(*self._every_x_range)-1
@@ -111,7 +116,10 @@ class RunEveryX(py_trees.decorators.Decorator):
     def tick(self):
         if self._cycles_remaining > 0:
             self._cycles_remaining -= 1
-            self.stop(py_trees.Status.FAILURE)
+            if self._always_success:
+                self.stop(py_trees.Status.SUCCESS)
+            else:
+                self.stop(py_trees.Status.FAILURE)
             yield self
         else:
             for node in super().tick():
