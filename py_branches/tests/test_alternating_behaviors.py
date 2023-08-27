@@ -3,9 +3,11 @@
 import pytest
 import py_trees
 import py_trees.console as console
+import random
 
 from py_branches.alternating_behaviors import ActivateBehavior
 from py_branches.alternating_behaviors import RunAlternating
+from py_branches.alternating_behaviors import RunEveryX
 
 
 class GuardedBehavior(py_trees.behaviour.Behaviour):
@@ -41,18 +43,22 @@ def create_guarded_behaviors(activate_list):
 
     return guarded_behaviors, guarded_behavior_decorators
 
+def check_guarded_behavior(guarded_behavior: py_trees.behaviour.Behaviour,
+                           initialised: bool,
+                           updated: bool,
+                           status: py_trees.Status):
+    assert guarded_behavior.initialised == initialised
+    assert guarded_behavior.updated == updated
+    assert guarded_behavior.status == status
+
 def check_guarded_behaviors(activate_list, guarded_behaviors):
     print(console.bold + f'{activate_list}: {[b.name for b in guarded_behaviors]}')
     for i, (activate, guarded_behavior_i) in enumerate(zip(activate_list, guarded_behaviors)):
-        print(console.bold + f'guarded_behavior_{i}.initialised == {activate}')
         assert guarded_behavior_i.initialised == activate
-        print(console.bold + f'guarded_behavior_{i}.updated == {activate}')
         assert guarded_behavior_i.updated == activate
         if activate:
-            print(console.bold + f'guarded_behavior_{i}.status == py_trees.Status.SUCCESS')
             assert guarded_behavior_i.status == py_trees.Status.SUCCESS
         else:
-            print(console.bold + f'guarded_behavior_{i}.status == py_trees.Status.INVALID')
             assert guarded_behavior_i.status == py_trees.Status.INVALID
 
 def test_activate_decorator_single():
@@ -70,11 +76,8 @@ def test_activate_decorator_single():
     # Test activated behavior
     py_trees.tests.tick_tree(root, 1, 1, visitor, print_snapshot=True)
     print("\n--------- Single Behavior - Activated ---------")
-    print(console.bold + 'guarded_behavior.initialised == True')
     assert guarded_behavior.initialised == True
-    print(console.bold + 'guarded_behavior.updated == True')
     assert guarded_behavior.updated == True
-    print(console.bold + 'guarded_behavior.status == py_trees.Status.SUCCESS')
     assert guarded_behavior.status == py_trees.Status.SUCCESS
 
     # Test deactivated behavior
@@ -82,11 +85,8 @@ def test_activate_decorator_single():
     guarded_behavior.reset()
     py_trees.tests.tick_tree(root, 2, 2, visitor, print_snapshot=True)
     print("\n--------- Single Behavior - Deactivated ---------")
-    print(console.bold + 'guarded_behavior.initialised == False')
     assert guarded_behavior.initialised == False
-    print(console.bold + 'guarded_behavior.updated == False')
     assert guarded_behavior.updated == False
-    print(console.bold + 'guarded_behavior.status == py_trees.Status.INVALID')
     assert guarded_behavior.status == py_trees.Status.INVALID
 
 def test_activate_decorator_multiple():
@@ -102,7 +102,6 @@ def test_activate_decorator_multiple():
     py_trees.tests.tick_tree(root, 1, 1, visitor, print_snapshot=True)
     print("\n--------- Multiple - Activated ---------")
     check_guarded_behaviors(activate_list, guarded_behaviors)
-    print(console.bold + 'root.status == py_trees.Status.SUCCESS')
     assert root.status == py_trees.Status.SUCCESS
 
     # Test deactivate behaviour
@@ -115,11 +114,10 @@ def test_activate_decorator_multiple():
     py_trees.tests.tick_tree(root, 2, 2, visitor, print_snapshot=True)
     print("\n--------- Multiple - Activated ---------")
     check_guarded_behaviors(new_activate_list, guarded_behaviors)
-    print(console.bold + 'root.status == py_trees.Status.INVALID')
     assert root.status == py_trees.Status.FAILURE
 
-def test_alternating_decorator():
-    print(console.bold + 'test_alternating_decorator')
+def test_alternating_behaviors():
+    print(console.bold + 'test_alternating_behaviors')
     root = py_trees.composites.Selector('root')
     guarded_behaviors, guarded_behavior_decorators = create_guarded_behaviors([False, False, False])
     counts = [1, 2, 3]
@@ -128,7 +126,7 @@ def test_alternating_decorator():
     py_trees.display.print_ascii_tree(root)
     visitor = py_trees.visitors.DebugVisitor()
  
-    print("\n--------- SUCCESS ---------")
+    print("\n--------- Alternating Behaviors - Success ---------")
     tick_num = 1
     for i, c in enumerate(counts):
         activate_list = [False] * len(guarded_behavior_decorators)
@@ -137,6 +135,59 @@ def test_alternating_decorator():
             [b.reset() for b in guarded_behaviors]
             py_trees.tests.tick_tree(root, tick_num, tick_num, visitor, print_snapshot=True)
             check_guarded_behaviors(activate_list, guarded_behaviors)
-            print(console.bold + 'run_alternating.status == py_trees.Status.SUCCESS')
             assert run_alternating.status == py_trees.Status.SUCCESS
             tick_num += 1
+
+def test_run_every_x_decorator():
+    print(console.bold + 'test_run_every_x_decorator')
+    root = py_trees.composites.Selector('root')
+    guarded_behavior = GuardedBehavior()
+    every_x_range = (3,3)
+    run_every_x_guarded_behavior = \
+        RunEveryX(name='run_every_x_guarded_behavior',
+                  child=guarded_behavior,
+                  every_x_range=every_x_range)
+    root.add_children([run_every_x_guarded_behavior])
+    py_trees.display.print_ascii_tree(root)
+    visitor = py_trees.visitors.DebugVisitor()
+
+    print("\n--------- Run Every X - Deterministic ---------")
+    for i in range(2*every_x_range[0]):
+        guarded_behavior.reset()
+        py_trees.tests.tick_tree(root, i, i, visitor, print_snapshot=True)
+        if (i+1)%every_x_range[0] == 0:
+            check_guarded_behavior(guarded_behavior, True, True, py_trees.Status.SUCCESS)
+            assert run_every_x_guarded_behavior.status == py_trees.Status.SUCCESS
+        else:
+            check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
+            assert run_every_x_guarded_behavior.status == py_trees.Status.FAILURE
+
+    print("\n--------- Run Every X - Random ---------")
+    run_every_x_guarded_behavior._every_x_range = (1,5)
+    
+    # Using random.seed(0) we can garentee when the guarded_behavior will be enabled.
+    iterations = 20
+    random.seed(0)
+    expected_successful_is = []
+    i = 0
+    while True:
+        i += random.randint(*run_every_x_guarded_behavior._every_x_range)
+        if i < iterations:
+            expected_successful_is.append(i)
+        else:
+            break
+
+    # We pre-calculated the expected indices at which the guarded_behavior will run.
+    random.seed(0)
+    run_every_x_guarded_behavior._cycles_remaining = \
+        random.randint(*run_every_x_guarded_behavior._every_x_range)
+    for i in range(iterations):
+        guarded_behavior.reset()
+        py_trees.tests.tick_tree(root, i, i, visitor, print_snapshot=True)
+        print(f'{i}: {run_every_x_guarded_behavior.status}')
+        if i in expected_successful_is:
+            check_guarded_behavior(guarded_behavior, True, True, py_trees.Status.SUCCESS)
+            assert run_every_x_guarded_behavior.status == py_trees.Status.SUCCESS
+        else:
+            check_guarded_behavior(guarded_behavior, False, False, py_trees.Status.INVALID)
+            assert run_every_x_guarded_behavior.status == py_trees.Status.FAILURE

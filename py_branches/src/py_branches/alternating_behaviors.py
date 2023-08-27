@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import rospy
 import py_trees
+import random
 from typing import List
+from typing import Tuple
 
 
 class ActivateBehavior(py_trees.decorators.Decorator):
@@ -13,8 +15,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
         child(Behavior): The child behavior that is being activated or not activated.
         name(str): Name of this behavior
     '''
-    def __init__(self, child, name: str,
-                              activate: bool):
+    def __init__(self, child, name: str, activate: bool):
         super(ActivateBehavior, self).__init__(name=name, child=child)
         self._activate = activate
 
@@ -77,3 +78,44 @@ class RunAlternating(py_trees.composites.Chooser):
             self._current_behavior_num_consecutive_runs = 0
             
         self._current_behavior_num_consecutive_runs += 1
+
+class RunEveryX(py_trees.decorators.Decorator):
+    '''
+    Enables the activation of child every X calls where X iterations. X is a range.
+
+    Args:
+        child(Behavior): The child behavior that is being activated or not activated.
+        name(str): Name of this behavior
+        every_x_range(Tuple[int, int]): Run the child ever however many cycles. Number of
+        cycles is within a range. Range is inclusive.
+
+    Example:
+        if every_x_range is:
+            (1,1) then the child behavior will run every cycle.
+            (5,5) then the child behavior will run every 5th cycle.
+            (1,5) then the child behavior will run randomly between every
+                cycle or every 5th cycle. Changes every times it child gets executed.
+    '''
+    def __init__(self, child, name: str, every_x_range: Tuple[int, int]):
+        assert every_x_range[0] <= every_x_range[1], \
+            'every_x_range must be a tuple with (smaller_number, bigger_number)'
+        assert every_x_range[0] > 0, 'Can not have range be lower than 1.'
+
+        super(RunEveryX, self).__init__(name=name, child=child)
+        self._every_x_range = every_x_range
+        self._cycles_remaining = random.randint(*self._every_x_range)-1
+
+    def initialise(self):
+        self._cycles_remaining = random.randint(*self._every_x_range)-1
+
+    def tick(self):
+        if self._cycles_remaining > 0:
+            self._cycles_remaining -= 1
+            self.stop(py_trees.Status.FAILURE)
+            yield self
+        else:
+            for node in super().tick():
+                yield node
+
+    def update(self):
+        return self.decorated.status
