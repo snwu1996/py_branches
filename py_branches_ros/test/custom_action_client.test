@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="fibonacci"
+        pkg="actionlib_tutorials"
+        type="fibonacci_server.py"
+        output="screen">
+  </node>
+  
+  <arg name="time_limit" default="10.0" />
+  <test test-name="custom_action_client"
+        pkg="py_branches_ros"
+        type="test_custom_action_client.py"
+        time-limit="$(arg time_limit)">
+  </test>
+</launch>
