@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-from __future__ import absolute_import
-from __future__ import print_function
 import py_trees
-from py_branches.blackboard_behaviors import IncrementBlackboardVariable
-from py_branches.blackboard_behaviors import IncrementBlackboardVariableIfCondition
-from py_branches.blackboard_behaviors import SetBlackboardVariableIfCondition
-from py_branches.blackboard_behaviors import RunIfBlackboardVariableEquals
+from py_branches.blackboard import IncrementBlackboardVariable
+from py_branches.blackboard import IncrementBlackboardVariableIfCondition
+from py_branches.blackboard import SetBlackboardVariableIfCondition
+from py_branches.blackboard import RunIfBlackboardVariableEquals
 
 
 _r = py_trees.Status.RUNNING

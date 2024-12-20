@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import rospy
 import py_trees
 import random
 from typing import List
@@ -42,7 +41,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
     def update(self):
         return self.decorated.status
 
-class RunAlternating(py_trees.composites.Chooser):
+class RunAlternating(py_trees.composites.Selector):
     '''
     Args:
         name(str): Name of the behavior

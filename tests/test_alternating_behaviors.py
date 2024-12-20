@@ -5,9 +5,9 @@ import py_trees
 import py_trees.console as console
 import random
 
-from py_branches.alternating_behaviors import ActivateBehavior
-from py_branches.alternating_behaviors import RunAlternating
-from py_branches.alternating_behaviors import RunEveryX
+from py_branches.alternating import ActivateBehavior
+from py_branches.alternating import RunAlternating
+from py_branches.alternating import RunEveryX
 
 
 class GuardedBehavior(py_trees.behaviour.Behaviour):

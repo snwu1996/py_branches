@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py_branches"
+version = "0.0.1"
+authors = [
+  { name="Shunong Wu", email="shunongwu@gmail.com" },
+]
+description = "Useful behaviors built on top of the the py_trees library."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    'Environment :: Console',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: BSD License',
+    'Programming Language :: Python',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    'Topic :: Software Development :: Libraries'
+]
+dependencies = ["py-trees==0.7.6",
+                "numpy",
+                "pyyaml",
+                "pytest"]
+
+[project.urls]
+Homepage = "https://github.com/snwu1996/py_branches"
+Issues = "https://github.com/snwu1996/py_branches/issues"

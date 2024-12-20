@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import rospy
+import logging
+import time
 import py_trees
 import datetime
 import random
@@ -20,10 +21,10 @@ class PauseUniform(py_trees.behaviour.Behaviour):
 
     def initialise(self):
         self._pause_t = np.random.uniform(self._low, self._high)
-        self._start_t = rospy.Time.now()
+        self._start_t = time.time()
 
     def update(self):
-        t_elapse = (rospy.Time.now() - self._start_t).to_sec()
+        t_elapse = (time.time() - self._start_t).to_sec()
         if t_elapse < self._pause_t:
             return py_trees.Status.RUNNING
         else:
@@ -43,8 +44,8 @@ def load_schedule_file(schedule_filepath: str):
         schedule.append({'start_pause_time': start_pause_time,
                          'stop_pause_time': stop_pause_time,
                          'variance_time': variance_time,
-                         'logout_plus_variance_time': add_variance_to_datetime_time(start_pause_time, variance_time),
-                         'login_plus_variance_time': add_variance_to_datetime_time(stop_pause_time, variance_time)})
+                         'start_plus_variance_time': add_variance_to_datetime_time(start_pause_time, variance_time),
+                         'stop_plus_variance_time': add_variance_to_datetime_time(stop_pause_time, variance_time)})
     return schedule
 
 class CheckPauseSchedule(py_trees.behaviour.Behaviour):
@@ -59,10 +60,10 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
             if idx == self._last_schedule_idx:
                 continue
 
-            logout = schedule_element['logout_plus_variance_time']
-            login = schedule_element['login_plus_variance_time']
-            if (logout < login and logout < now_time < login) or \
-               (logout > login and (now_time > logout or now_time < login)): 
+            start = schedule_element['start_plus_variance_time']
+            stop = schedule_element['stop_plus_variance_time']
+            if (start < stop and start < now_time < stop) or \
+               (start > stop and (now_time > start or now_time < stop)):
                 self._last_schedule_idx = idx
                 return py_trees.Status.SUCCESS
         return py_trees.Status.FAILURE
@@ -89,33 +90,33 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         self._t_start = None
         now_time = datetime.datetime.now().time()
         for schedule_element in self._schedule:
-            logout = schedule_element['logout_plus_variance_time']
-            login = schedule_element['login_plus_variance_time']
+            start = schedule_element['start_plus_variance_time']
+            stop = schedule_element['stop_plus_variance_time']
             variance = schedule_element['variance_time']
-            if (logout < login and logout < now_time < login) or \
-               (logout > login and (now_time > logout or now_time < login)): 
-                if now_time < login:
-                    self._t_wait = datetime_time_to_sec(login) - \
+            if (start < stop and start < now_time < stop) or \
+               (start > stop and (now_time > start or now_time < stop)):
+                if now_time < stop:
+                    self._t_wait = datetime_time_to_sec(stop) - \
                                    datetime_time_to_sec(now_time)
                 else:
                     self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
                                    datetime_time_to_sec(now_time) + \
-                                   datetime_time_to_sec(login)
-                self._t_start = rospy.Time.now()
-                rospy.loginfo(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
-                schedule_element['logout_plus_variance_time'] = \
+                                   datetime_time_to_sec(stop)
+                self._t_start = time.time()
+                logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
+                schedule_element['start_plus_variance_time'] = \
                     add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
-                schedule_element['login_plus_variance_time'] = \
+                schedule_element['stop_plus_variance_time'] = \
                     add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
-                rospy.loginfo(f'new logout_plus_variance_time: {schedule_element["logout_plus_variance_time"]}')
-                rospy.loginfo(f'new login_plus_variance_time: {schedule_element["login_plus_variance_time"]}')
+                logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
+                logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
                 break
 
     def update(self):
         if self._t_wait is None:
             return py_trees.Status.SUCCESS
 
-        t_elapse = (rospy.Time.now() - self._t_start).to_sec()
+        t_elapse = (time.time() - self._t_start).to_sec()
         if t_elapse < self._t_wait:
             return py_trees.Status.RUNNING
         else:

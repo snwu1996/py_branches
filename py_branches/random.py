@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import rospy
 import py_trees
 import random
 from typing import List
@@ -44,7 +43,7 @@ class RandomRun(py_trees.decorators.Decorator):
 
         return self.decorated.status
 
-class RandomSelector(py_trees.composites.Chooser):
+class RandomSelector(py_trees.composites.Selector):
     def __init__(self, name, behaviors: List, probabilities: List[float]):
         assert sum(probabilities) == 1.0, 'sum(probabilities) must add up to 1.0'
         assert len(probabilities) == len(behaviors), \
@@ -68,5 +67,5 @@ class RandomSelector(py_trees.composites.Chooser):
 
             cumulative_prob += raw_prob
 
-        rospy.loginfo(f'behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}')
+        logging.info(f'behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}')
         super(RandomSelector, self).__init__(name, children)
