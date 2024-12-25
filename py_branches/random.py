@@ -13,9 +13,9 @@ class RandomSuccess(py_trees.behaviour.Behaviour):
 
     def update(self):
         if random.random() < self._probability:
-            return py_trees.Status.SUCCESS
+            return py_trees.common.Status.SUCCESS
         else:
-            return py_trees.Status.FAILURE
+            return py_trees.common.Status.FAILURE
 
 class RandomRun(py_trees.decorators.Decorator):
     '''
@@ -37,9 +37,9 @@ class RandomRun(py_trees.decorators.Decorator):
     def update(self):
         if not self._run:
             if self._success_if_not_ran:
-                return py_trees.Status.SUCCESS
+                return py_trees.common.Status.SUCCESS
             else:
-                return py_trees.Status.FAILURE
+                return py_trees.common.Status.FAILURE
 
         return self.decorated.status
 

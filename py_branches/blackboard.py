@@ -4,7 +4,7 @@ from typing import Optional
 import py_trees
 
 
-def _get_and_check(bb: py_trees.Blackboard, var: str, types: Optional[list], logger):
+def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger):
     value = bb.get(var)
     if value is None:
         logger.warning(f'Tried to increment blackboard {var} but it doens\'t exist.')
@@ -13,17 +13,18 @@ def _get_and_check(bb: py_trees.Blackboard, var: str, types: Optional[list], log
             f'of type {type(value)}, variable must be of type {types}.')
     return value
 
-class IncrementBlackboardVariable(py_trees.behaviours.Behaviour):
+class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
     def __init__(self, name: str, variable_name: str, increment_by: float=1.0):
         super(IncrementBlackboardVariable, self).__init__(name)
         self._variable_name = variable_name
         self._increment_by = increment_by
         self._return_sucess = False
-        self._blackboard = py_trees.Blackboard()
+        self._blackboard = py_trees.blackboard.Client()
+        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
 
     def initialise(self):
         current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
-        self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
+        self._blackboard.set(self._variable_name, current_value+self._increment_by)
         self._return_sucess = True
 
     def update(self):
@@ -33,12 +34,13 @@ class IncrementBlackboardVariable(py_trees.behaviours.Behaviour):
             return py_trees.common.Status.FAILURE
 
 class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
-    def __init__(self, child, name: str, variable_name: str, condition: py_trees.Status, increment_by: float=1.0):
+    def __init__(self, child, name: str, variable_name: str, condition: py_trees.common.Status, increment_by: float=1.0):
         super(IncrementBlackboardVariableIfCondition, self).__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._increment_by = increment_by
-        self._blackboard = py_trees.Blackboard()
+        self._blackboard = py_trees.blackboard.Client()
+        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
 
     def update(self):
         if self.decorated.status == self._condition:
@@ -48,12 +50,13 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         return self.decorated.status
 
 class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
-    def __init__(self, child, name: str, variable_name: str, condition: py_trees.Status, set_to: Any):
+    def __init__(self, child, name: str, variable_name: str, condition: py_trees.common.Status, set_to: Any):
         super(SetBlackboardVariableIfCondition, self).__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._set_to = set_to
-        self._blackboard = py_trees.Blackboard()
+        self._blackboard = py_trees.blackboard.Client()
+        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
 
     def update(self):
         if self.decorated.status == self._condition:
@@ -62,14 +65,15 @@ class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         return self.decorated.status
 
 class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
-    def __init__(self, child, name: str, variable_name: str, equals: Any, always_success: bool=True):
+    def __init__(self, child, name: str, variable_name: str, equals: Any, success_if_skip: bool=True):
         super(RunIfBlackboardVariableEquals, self).__init__(name=name, child=child)
         self._variable_name = variable_name
         self._equals = equals
-        self._blackboard = py_trees.Blackboard()
+        self._blackboard = py_trees.blackboard.Client()
+        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
         self._run_child = False
         self._initialized = False
-        self._ret_status_on_failure = py_trees.Status.SUCCESS if always_success else py_trees.Status.FAILURE
+        self._ret_status_on_failure = py_trees.common.Status.SUCCESS if success_if_skip else py_trees.common.Status.FAILURE
 
     def initialise(self):
         current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
@@ -91,7 +95,7 @@ class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
 
     def update(self):
         if self._run_child:
-            if self.decorated.status != py_trees.Status.RUNNING:
+            if self.decorated.status != py_trees.common.Status.RUNNING:
                 self._reset()
             return self.decorated.status
         else:

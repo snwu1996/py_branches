@@ -26,9 +26,9 @@ class PauseUniform(py_trees.behaviour.Behaviour):
     def update(self):
         t_elapse = (time.time() - self._start_t).to_sec()
         if t_elapse < self._pause_t:
-            return py_trees.Status.RUNNING
+            return py_trees.common.Status.RUNNING
         else:
-            return py_trees.Status.SUCCESS
+            return py_trees.common.Status.SUCCESS
 
 def load_schedule_file(schedule_filepath: str):
     assert os.path.isfile(schedule_filepath), f'schedule_filepath: {schedule_filepath} is not a valid file'
@@ -65,8 +65,8 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
             if (start < stop and start < now_time < stop) or \
                (start > stop and (now_time > start or now_time < stop)):
                 self._last_schedule_idx = idx
-                return py_trees.Status.SUCCESS
-        return py_trees.Status.FAILURE
+                return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.FAILURE
 
 def datetime_time_to_sec(time):
     sec = time.hour*HOUR2SEC+time.minute*MIN2SEC+time.second
@@ -114,10 +114,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
 
     def update(self):
         if self._t_wait is None:
-            return py_trees.Status.SUCCESS
+            return py_trees.common.Status.SUCCESS
 
         t_elapse = (time.time() - self._t_start).to_sec()
         if t_elapse < self._t_wait:
-            return py_trees.Status.RUNNING
+            return py_trees.common.Status.RUNNING
         else:
-            return py_trees.Status.SUCCESS
+            return py_trees.common.Status.SUCCESS

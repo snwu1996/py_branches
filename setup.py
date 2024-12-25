@@ -2,7 +2,7 @@
 
 from setuptools import find_packages, setup
 
-install_requires = ['py_trees==0.7.6',
+install_requires = ['py-trees',
                     'numpy',
                     'pyyaml']
 

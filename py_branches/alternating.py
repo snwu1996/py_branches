@@ -14,10 +14,10 @@ class ActivateBehavior(py_trees.decorators.Decorator):
         child(Behavior): The child behavior that is being activated or not activated.
         name(str): Name of this behavior
     '''
-    def __init__(self, child, name: str, activate: bool, always_success:bool=False):
+    def __init__(self, child, name: str, activate: bool, success_if_skip:bool=False):
         super(ActivateBehavior, self).__init__(name=name, child=child)
         self._activate = activate
-        self._always_success = always_success
+        self._success_if_skip = success_if_skip
 
     @property
     def activate(self):
@@ -29,10 +29,10 @@ class ActivateBehavior(py_trees.decorators.Decorator):
 
     def tick(self):
         if not self._activate:
-            if self._always_success:
-                self.stop(py_trees.Status.SUCCESS)
+            if self._success_if_skip:
+                self.stop(py_trees.common.Status.SUCCESS)
             else:
-                self.stop(py_trees.Status.FAILURE)
+                self.stop(py_trees.common.Status.FAILURE)
             yield self
         else:
             for node in super().tick():
@@ -71,7 +71,7 @@ class RunAlternating(py_trees.composites.Selector):
                                  activate=True if idx == 0 else False)
             children.append(activate_decorator)
 
-        super(RunAlternating, self).__init__(name, children)
+        super(RunAlternating, self).__init__(name, False, children)
 
     def initialise(self):
         if self._current_behavior_num_consecutive_runs >= self._counts[self._current_behavior_idx]:
@@ -84,7 +84,8 @@ class RunAlternating(py_trees.composites.Selector):
 
 class RunEveryX(py_trees.decorators.Decorator):
     '''
-    Enables the activation of child every X calls where X iterations. X is a range.
+    Enables the activation of child every X calls. X can falls within a range
+    and gets recalculated every success.
 
     Args:
         child(Behavior): The child behavior that is being activated or not activated.
@@ -93,13 +94,23 @@ class RunEveryX(py_trees.decorators.Decorator):
         cycles is within a range. Range is inclusive.
 
     Example:
+        E: Executes that cycle.
+        S: Skips that cycle.
         if every_x_range is:
             (1,1) then the child behavior will run every cycle.
+                E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, ...
             (5,5) then the child behavior will run every 5th cycle.
+                S, S, S, S, E, S, S, S, S, E, S, S, S, S, E, ...
             (1,5) then the child behavior will run randomly between every
-                cycle or every 5th cycle. Changes every times it child gets executed.
+            cycle or every 5th cycle. Changes every times it child gets executed.
+                S, S, E, S, S, S, S, E, E, S, S, S, E, S, S, ...
+                The execute cycle above goes:
+                    3: S, S, E
+                    5: S, S, S, S, E
+                    1: E
+                    4: S, S, S, E
     '''
-    def __init__(self, child, name: str, every_x_range: Tuple[int, int], always_success:bool=False):
+    def __init__(self, child, name: str, every_x_range: Tuple[int, int], success_if_skip:bool=False):
         assert every_x_range[0] <= every_x_range[1], \
             'every_x_range must be a tuple with (smaller_number, bigger_number)'
         assert every_x_range[0] > 0, 'Can not have range be lower than 1.'
@@ -107,7 +118,7 @@ class RunEveryX(py_trees.decorators.Decorator):
         super(RunEveryX, self).__init__(name=name, child=child)
         self._every_x_range = every_x_range
         self._cycles_remaining = random.randint(*self._every_x_range)-1
-        self._always_success = always_success
+        self._success_if_skip = success_if_skip
 
     def initialise(self):
         self._cycles_remaining = random.randint(*self._every_x_range)-1
@@ -115,10 +126,10 @@ class RunEveryX(py_trees.decorators.Decorator):
     def tick(self):
         if self._cycles_remaining > 0:
             self._cycles_remaining -= 1
-            if self._always_success:
-                self.stop(py_trees.Status.SUCCESS)
+            if self._success_if_skip:
+                self.stop(py_trees.common.Status.SUCCESS)
             else:
-                self.stop(py_trees.Status.FAILURE)
+                self.stop(py_trees.common.Status.FAILURE)
             yield self
         else:
             for node in super().tick():
