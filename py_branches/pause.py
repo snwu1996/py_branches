@@ -7,6 +7,8 @@ import random
 import yaml
 import os
 import numpy as np
+from typing import Dict
+from typing import List
 
 
 HOUR2SEC = 3600
@@ -24,7 +26,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
         self._start_t = time.time()
 
     def update(self):
-        t_elapse = (time.time() - self._start_t).to_sec()
+        t_elapse = time.time() - self._start_t
         if t_elapse < self._pause_t:
             return py_trees.common.Status.RUNNING
         else:
@@ -68,11 +70,11 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
                 return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.FAILURE
 
-def datetime_time_to_sec(time):
+def datetime_time_to_sec(time: datetime.time):
     sec = time.hour*HOUR2SEC+time.minute*MIN2SEC+time.second
     return sec
     
-def add_variance_to_datetime_time(time, variance_time):
+def add_variance_to_datetime_time(time: datetime.time, variance_time: datetime.time) -> datetime.time:
     variance_sec = datetime_time_to_sec(variance_time)
     variance_timedelta = datetime.timedelta(seconds=random.uniform(0.0, variance_sec))
     time_to_datetime = datetime.datetime.combine(datetime.date.today(), time)
@@ -80,14 +82,14 @@ def add_variance_to_datetime_time(time, variance_time):
     return time_with_variance
 
 class PauseSchedule(py_trees.behaviour.Behaviour):
-    def __init__(self, name: str, schedule):
+    def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
         self._schedule = schedule
         super(PauseSchedule, self).__init__(name=name)
 
     def initialise(self):
         super().initialise()
         self._t_wait = None
-        self._t_start = None
+        self._t_start = time.time()
         now_time = datetime.datetime.now().time()
         for schedule_element in self._schedule:
             start = schedule_element['start_plus_variance_time']
@@ -116,7 +118,7 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         if self._t_wait is None:
             return py_trees.common.Status.SUCCESS
 
-        t_elapse = (time.time() - self._t_start).to_sec()
+        t_elapse = time.time() - self._t_start
         if t_elapse < self._t_wait:
             return py_trees.common.Status.RUNNING
         else:

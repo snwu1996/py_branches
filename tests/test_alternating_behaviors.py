@@ -5,7 +5,7 @@ import py_trees
 import py_trees.console as console
 import random
 from py_branches.alternating import ActivateBehavior
-from py_branches.alternating import RunAlternating
+from py_branches.alternating import run_alternating
 from py_branches.alternating import RunEveryX
 
 
@@ -130,8 +130,8 @@ def test_alternating_behaviors():
     root = py_trees.composites.Selector('root', False)
     guarded_behaviors, guarded_behavior_decorators = create_guarded_behaviors([False, False, False])
     counts = [1, 2, 3]
-    run_alternating = RunAlternating('run_alternating', guarded_behaviors, counts=counts)
-    root.add_children([run_alternating])
+    run_alternating_test = run_alternating('run_alternating', guarded_behaviors, counts=counts)
+    root.add_children([run_alternating_test])
     py_trees.display.ascii_tree(root)
     visitor = py_trees.visitors.DebugVisitor()
  
@@ -144,7 +144,7 @@ def test_alternating_behaviors():
             [b.reset() for b in guarded_behaviors]
             py_trees.tests.tick_tree(root, tick_num, tick_num, visitors=[visitor], print_snapshot=True)
             check_guarded_behaviors(activate_list, guarded_behaviors)
-            assert run_alternating.status == _s
+            assert run_alternating_test.status == _s
             tick_num += 1
 
 def test_run_every_x_decorator():

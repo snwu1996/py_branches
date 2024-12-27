@@ -38,49 +38,52 @@ class ActivateBehavior(py_trees.decorators.Decorator):
             for node in super().tick():
                 yield node
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         return self.decorated.status
 
-class RunAlternating(py_trees.composites.Selector):
-    '''
-    Args:
-        name(str): Name of the behavior
-        behaviors(List[Behaviors]): List of all the behaviors to run alternating.
-        count(List[int]): A list of how many times the corresponding behavior ought to be ran.
-
-            Example:
-                A if behaviors is [behavior_a, behavior_b, behavior_c] and count is [3,2,4] then 
-                behavior_a will run 3 times in a row, behavior_b will run 2 times in a row, and 
-                behavior_c will run 4 times in a row before repeating.
-    '''
-    def __init__(self, name: str, behaviors: List, counts: List[int]):
-        assert 0 not in counts, \
-            f'counts({counts}) can not have 0 in the list.'
-        assert len(counts) == len(behaviors), \
-            'len(counts) != len(behaviors), two lists must be of same length.'
-
+class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
+    def __init__(self, name: str, activatable_behaviors: List[ActivateBehavior], counts: List[int]):
         self._counts = counts
         self._current_behavior_idx = 0
         self._current_behavior_num_consecutive_runs = 0
+        self._activatable_behaviors = activatable_behaviors
+        self._activatable_behaviors[0].activate = True
 
-        children = []
-        for idx, behavior in enumerate(behaviors):
-            activate_decorator = \
-                ActivateBehavior(child=behavior, 
-                                 name=f'activate_{behavior.name}',
-                                 activate=True if idx == 0 else False)
-            children.append(activate_decorator)
+        super().__init__(name)
 
-        super(RunAlternating, self).__init__(name, False, children)
-
-    def initialise(self):
+    def initialise(self) -> None:
         if self._current_behavior_num_consecutive_runs >= self._counts[self._current_behavior_idx]:
-            self.children[self._current_behavior_idx].activate = False
+            self._activatable_behaviors[self._current_behavior_idx].activate = False
             self._current_behavior_idx = (self._current_behavior_idx + 1) % len(self._counts)
-            self.children[self._current_behavior_idx].activate = True
+            self._activatable_behaviors[self._current_behavior_idx].activate = True
             self._current_behavior_num_consecutive_runs = 0
-            
+
         self._current_behavior_num_consecutive_runs += 1
+
+    def update(self) -> py_trees.common.Status:
+        return py_trees.common.Status.FAILURE
+
+def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], counts: List[int]):
+    assert 0 not in counts, \
+        f'counts({counts}) can not have 0 in the list.'
+    assert len(counts) == len(behaviors), \
+        'len(counts) != len(behaviors), two lists must be of same length.'
+
+    alternating_behaviors = []
+    for idx, behavior in enumerate(behaviors):
+        activate_decorator = ActivateBehavior(behavior, f'activate_{behavior.name}', False)
+        alternating_behaviors.append(activate_decorator)
+    run_alternating_helper = _RunAlternatingHelper(f'{name}_helper', alternating_behaviors, counts)
+
+    children = []
+    children.append(run_alternating_helper)
+    children += alternating_behaviors
+
+    run_alternating_selector = py_trees.composites.Selector(name, False, children)
+    return run_alternating_selector
+
+# class RunEveryXOfY(py_trees.decorators.Decorator):
+#     pass
 
 class RunEveryX(py_trees.decorators.Decorator):
     '''
@@ -135,5 +138,5 @@ class RunEveryX(py_trees.decorators.Decorator):
             for node in super().tick():
                 yield node
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         return self.decorated.status
