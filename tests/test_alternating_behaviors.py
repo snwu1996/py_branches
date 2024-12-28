@@ -5,6 +5,7 @@ import py_trees
 import py_trees.console as console
 import random
 from py_branches.alternating import ActivateBehavior
+from py_branches.alternating import RunEveryRange
 from py_branches.alternating import run_alternating
 from py_branches.alternating import RunEveryX
 
@@ -205,10 +206,30 @@ def test_run_every_x_decorator():
     for i in range(iterations):
         guarded_behavior.reset()
         py_trees.tests.tick_tree(root, i, i, visitors=[visitor], print_snapshot=True)
-        print(f'{i}: {run_every_x_guarded_behavior.status}')
         if i in expected_successful_is:
             check_guarded_behavior(guarded_behavior, True, True, _s)
             assert run_every_x_guarded_behavior.status == _s
         else:
             check_guarded_behavior(guarded_behavior, False, False, _i)
             assert run_every_x_guarded_behavior.status == _f
+
+def test_run_every_range_decorator():
+    print(console.bold + 'test_run_every_x_decorator')
+    root = py_trees.composites.Selector('root', False)
+    guarded_behavior = GuardedBehavior()
+    max_range = 10
+    run_range = (3, 5)
+    run_every_range_behavior = RunEveryRange(guarded_behavior, 'run_every_range', max_range, run_range)
+    root.add_children([run_every_range_behavior])
+    py_trees.display.ascii_tree(root)
+    visitor = py_trees.visitors.DebugVisitor()
+
+    for i in range(1, max_range+1):
+        guarded_behavior.reset()
+        py_trees.tests.tick_tree(root, i, i, visitors=[visitor], print_snapshot=True)
+        if run_range[0] <= i <= run_range[1]:
+            check_guarded_behavior(guarded_behavior, True, True, _s)
+            assert run_every_range_behavior.status == _s
+        else:
+            check_guarded_behavior(guarded_behavior, False, False, _i)
+            assert run_every_range_behavior.status == _f

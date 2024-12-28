@@ -37,7 +37,6 @@ class RandomRun(py_trees.decorators.Decorator):
     def terminate(self, new_status: py_trees.common.Status) -> None:
         self._run = random.random() <= self._probability
 
-
 def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabilities: List[float]):
     assert sum(probabilities) == 1.0, 'sum(probabilities) must add up to 1.0'
     assert len(probabilities) == len(behaviors), \
