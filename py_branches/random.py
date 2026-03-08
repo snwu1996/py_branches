@@ -38,7 +38,8 @@ class RandomRun(py_trees.decorators.Decorator):
         self._run = random.random() <= self._probability
 
 def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabilities: List[float]):
-    assert sum(probabilities) == 1.0, 'sum(probabilities) must add up to 1.0'
+    assert abs(sum(probabilities) - 1.0) < 1e-9, \
+        f'sum(probabilities) must add up to 1.0, got {sum(probabilities)}'
     assert len(probabilities) == len(behaviors), \
         'len(probabilities) != len(behaviors), two lists must be of same length.'
 

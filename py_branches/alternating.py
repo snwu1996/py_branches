@@ -125,7 +125,7 @@ class RunEveryRange(py_trees.decorators.Decorator):
         assert run_range[0] <= run_range[1], \
             'run_range must be a tuple with (smaller_number, bigger_number)'
         assert 1 <= run_range[0], 'Lower run range must be greater or equal to 1'
-        assert run_range[0] <= max_range, f'Upper run range must be lower or equal to {max_range}'
+        assert run_range[1] <= max_range, f'Upper run range must be lower or equal to {max_range}'
 
         super(RunEveryRange, self).__init__(name=name, child=child)
         self._max_range = max_range

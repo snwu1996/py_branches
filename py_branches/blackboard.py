@@ -5,7 +5,11 @@ import py_trees
 
 
 def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger):
-    value = bb.get(var)
+    try:
+        value = bb.get(var)
+    except KeyError:
+        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        return None
     if value is None:
         logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
         return None
