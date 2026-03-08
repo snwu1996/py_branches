@@ -2,7 +2,7 @@
 import py_trees
 import time
 import datetime
-import numpy as np
+import random
 
 from py_branches.pause import PauseUniform
 from py_branches.pause import PauseSchedule
@@ -10,7 +10,7 @@ from py_branches.pause import CheckPauseSchedule
 
 
 def test_pause_uniform():
-    np.random.seed(0)
+    random.seed(0)
     pause_uniform = PauseUniform('pause_uniform', 0.2, 0.5)
     start_ts = time.time()
     while True:

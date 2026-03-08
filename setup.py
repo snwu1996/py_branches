@@ -3,7 +3,6 @@
 from setuptools import find_packages, setup
 
 install_requires = ['py-trees',
-                    'numpy',
                     'pyyaml']
 
 setup(

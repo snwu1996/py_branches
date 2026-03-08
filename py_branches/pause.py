@@ -6,7 +6,6 @@ import datetime
 import random
 import yaml
 import os
-import numpy as np
 from typing import Dict
 from typing import List
 
@@ -22,7 +21,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
         self._low = low
 
     def initialise(self):
-        self._pause_t = np.random.uniform(self._low, self._high)
+        self._pause_t = random.uniform(self._low, self._high)
         self._start_t = time.time()
 
     def update(self):
@@ -33,7 +32,8 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.SUCCESS
 
 def load_schedule_file(schedule_filepath: str):
-    assert os.path.isfile(schedule_filepath), f'schedule_filepath: {schedule_filepath} is not a valid file'
+    if not os.path.isfile(schedule_filepath):
+        raise FileNotFoundError(f'schedule_filepath: {schedule_filepath} is not a valid file')
     
     with open(schedule_filepath, 'r') as schedule_file:
         schedule_raw = yaml.safe_load(schedule_file)
@@ -79,14 +79,14 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
         self._last_schedule_idx = matched_schedule_idx
         return py_trees.common.Status.SUCCESS
 
-def datetime_time_to_sec(time: datetime.time):
-    sec = time.hour*HOUR2SEC+time.minute*MIN2SEC+time.second
+def datetime_time_to_sec(t: datetime.time):
+    sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
     return sec
-    
-def add_variance_to_datetime_time(time: datetime.time, variance_time: datetime.time) -> datetime.time:
+
+def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time) -> datetime.time:
     variance_sec = datetime_time_to_sec(variance_time)
     variance_timedelta = datetime.timedelta(seconds=random.uniform(0.0, variance_sec))
-    time_to_datetime = datetime.datetime.combine(datetime.date.today(), time)
+    time_to_datetime = datetime.datetime.combine(datetime.date.today(), t)
     time_with_variance = (time_to_datetime + variance_timedelta).time()
     return time_with_variance
 

@@ -11,13 +11,15 @@ class RandomRun(py_trees.decorators.Decorator):
     Random chance of running the child of this decorator.
     '''
     def __init__(self, child, name, probability: float, success_if_skip: bool = False):
-        super(RandomRun, self).__init__(name=name, child=child)
         assert probability >= 0 and probability <= 1.0, f'Probability == {probability} but needs to be in range [0, 1.0]'
+        super(RandomRun, self).__init__(name=name, child=child)
         self._probability = probability
-        self._run = random.random() <= self._probability
+        self._run = None  # rolled on first tick; terminate() handles all subsequent rolls
         self._success_if_skip = success_if_skip
 
     def tick(self):
+        if self._run is None:
+            self._run = random.random() <= self._probability
         if not self._run:
             for node in py_trees.behaviour.Behaviour.tick(self):
                 yield node

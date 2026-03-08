@@ -74,4 +74,4 @@ def test_random_selector():
     for _ in range(samples):
         rs.tick_once()
         foo_counts[bb.foo] += 1
-    assert(foo_counts == {1.0: 15, 10.0: 30, 100.0: 55})
+    assert(foo_counts == {1.0: 15, 10.0: 29, 100.0: 56})
