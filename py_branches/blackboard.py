@@ -7,10 +7,12 @@ import py_trees
 def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger):
     value = bb.get(var)
     if value is None:
-        logger.warning(f'Tried to increment blackboard {var} but it doens\'t exist.')
+        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        return None
     if types is not None and type(value) not in types:
-        logger.warning(f'Tried to increment blackboard variable {var} '+
-            f'of type {type(value)}, variable must be of type {types}.')
+        logger.warning(f'Tried to access blackboard variable {var} ' +
+            f'of type {type(value)}, variable must be one of {types}.')
+        return None
     return value
 
 class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
@@ -23,7 +25,13 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
         self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
 
     def initialise(self):
+        self._return_sucess = False
         current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
+        if current_value is None:
+            self.logger.warning(
+                f'Failed to increment blackboard variable {self._variable_name}: value missing or invalid.'
+            )
+            return
         self._blackboard.set(self._variable_name, current_value+self._increment_by)
         self._return_sucess = True
 
@@ -45,7 +53,8 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
     def update(self):
         if self.decorated.status == self._condition:
             current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
-            self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
+            if current_value is not None:
+                self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
 
         return self.decorated.status
 

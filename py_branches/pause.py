@@ -58,17 +58,26 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
 
     def update(self):
         now_time = datetime.datetime.now().time()
+        matched_schedule_idx = None
         for idx, schedule_element in enumerate(self._schedule):
-            if idx == self._last_schedule_idx:
-                continue
-
             start = schedule_element['start_plus_variance_time']
             stop = schedule_element['stop_plus_variance_time']
             if (start < stop and start < now_time < stop) or \
                (start > stop and (now_time > start or now_time < stop)):
-                self._last_schedule_idx = idx
-                return py_trees.common.Status.SUCCESS
-        return py_trees.common.Status.FAILURE
+                matched_schedule_idx = idx
+                break
+
+        # Re-arm once we've left all windows.
+        if matched_schedule_idx is None:
+            self._last_schedule_idx = None
+            return py_trees.common.Status.FAILURE
+
+        # Prevent repeated SUCCESS ticks while remaining in the same window.
+        if matched_schedule_idx == self._last_schedule_idx:
+            return py_trees.common.Status.FAILURE
+
+        self._last_schedule_idx = matched_schedule_idx
+        return py_trees.common.Status.SUCCESS
 
 def datetime_time_to_sec(time: datetime.time):
     sec = time.hour*HOUR2SEC+time.minute*MIN2SEC+time.second

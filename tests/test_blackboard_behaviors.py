@@ -33,6 +33,31 @@ def test_increment_blackboard_variable():
     assert(blackboard.foo == 2)
     assert(increment_foo.status == py_trees.common.Status.SUCCESS)
 
+
+def test_increment_blackboard_variable_invalid_value_fails_safely():
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key='missing_var', access=py_trees.common.Access.WRITE)
+    blackboard.register_key(key='string_var', access=py_trees.common.Access.WRITE)
+    blackboard.string_var = "not_a_number"
+
+    increment_missing = IncrementBlackboardVariable(
+        name="Increment Missing",
+        variable_name="missing_var",
+        increment_by=1,
+    )
+    increment_missing.tick_once()
+    assert increment_missing.status == py_trees.common.Status.FAILURE
+    assert not blackboard.exists("missing_var")
+
+    increment_string = IncrementBlackboardVariable(
+        name="Increment String",
+        variable_name="string_var",
+        increment_by=1,
+    )
+    increment_string.tick_once()
+    assert increment_string.status == py_trees.common.Status.FAILURE
+    assert blackboard.string_var == "not_a_number"
+
 def test_increment_blackboard_variable_if_condition():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
