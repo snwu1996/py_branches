@@ -21,8 +21,10 @@ classifiers = [
 ]
 dependencies = ["py-trees",
                 "numpy",
-                "pyyaml",
-                "pytest"]
+                "pyyaml"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
 
 [project.urls]
 Homepage = "https://github.com/snwu1996/py_branches"
