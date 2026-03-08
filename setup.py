@@ -8,7 +8,7 @@ install_requires = ['py-trees',
 
 setup(
     name="py_branches",
-    version="0.0.1",
+    version="1.0.0",
     packages=find_packages(exclude=["tests*", "configs*"]),
     install_requires=install_requires,
 )
