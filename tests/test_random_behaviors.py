@@ -15,7 +15,7 @@ def test_random_run():
     assert(bb.exists("foo"))
     assert(bb.foo == 1.0)
 
-    set_bb = py_trees.behaviours.SetBlackboardVariable('set_bb','foo', 10.0, True)
+    set_bb = py_trees.behaviours.SetBlackboardVariable('foo', 10.0, True, 'set_bb')
 
     print('\n---------------100% probability of success---------------')
     random_run_100_success = RandomRun(set_bb, 'random_run_100_success', 1.0)
@@ -63,9 +63,9 @@ def test_random_selector():
     assert(bb.exists("foo"))
     assert(bb.foo == 1.0)
 
-    set_bb_1 = py_trees.behaviours.SetBlackboardVariable('set_bb','foo', 1.0, True)
-    set_bb_10 = py_trees.behaviours.SetBlackboardVariable('set_bb','foo', 10.0, True)
-    set_bb_100 = py_trees.behaviours.SetBlackboardVariable('set_bb','foo', 100.0, True)
+    set_bb_1 = py_trees.behaviours.SetBlackboardVariable('foo', 1.0, True, 'set_bb')
+    set_bb_10 = py_trees.behaviours.SetBlackboardVariable('foo', 10.0, True, 'set_bb')
+    set_bb_100 = py_trees.behaviours.SetBlackboardVariable('foo', 100.0, True, 'set_bb')
     samples = 100
 
     rs = random_selector('random_selector' ,[set_bb_1, set_bb_10, set_bb_100], [0.2, 0.3, 0.5])
