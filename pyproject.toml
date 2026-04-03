@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py_branches"
-version = "1.2.0"
+version = "1.2.1"
 description = "Useful behaviors built on top of the py_trees library."
 authors = ["Shunong Wu <shunongwu@gmail.com>"]
 license = "BSD"
