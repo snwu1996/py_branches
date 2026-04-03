@@ -5,12 +5,18 @@ import py_trees
 
 
 def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger):
-    value = bb.get(var)
+    try:
+        value = bb.get(var)
+    except KeyError:
+        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        return None
     if value is None:
-        logger.warning(f'Tried to increment blackboard {var} but it doens\'t exist.')
+        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        return None
     if types is not None and type(value) not in types:
-        logger.warning(f'Tried to increment blackboard variable {var} '+
-            f'of type {type(value)}, variable must be of type {types}.')
+        logger.warning(f'Tried to access blackboard variable {var} ' +
+            f'of type {type(value)}, variable must be one of {types}.')
+        return None
     return value
 
 class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
@@ -23,7 +29,13 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
         self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
 
     def initialise(self):
+        self._return_sucess = False
         current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
+        if current_value is None:
+            self.logger.warning(
+                f'Failed to increment blackboard variable {self._variable_name}: value missing or invalid.'
+            )
+            return
         self._blackboard.set(self._variable_name, current_value+self._increment_by)
         self._return_sucess = True
 
@@ -45,7 +57,8 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
     def update(self):
         if self.decorated.status == self._condition:
             current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
-            self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
+            if current_value is not None:
+                self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
 
         return self.decorated.status
 
@@ -72,36 +85,26 @@ class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
         self._blackboard = py_trees.blackboard.Client()
         self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
         self._run_child = False
-        self._initialized = False
         self._ret_status_on_failure = py_trees.common.Status.SUCCESS if success_if_skip else py_trees.common.Status.FAILURE
 
-    def initialise(self):
-        current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
-        self._run_child = current_value == self._equals
-        self._initialized = True
-
     def tick(self):
-        if not self._initialized:
-            self.initialise()
+        # Re-evaluate the condition on each fresh entry; preserve it while child is RUNNING.
+        if self.status != py_trees.common.Status.RUNNING:
+            current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
+            self._run_child = current_value == self._equals
 
         if self._run_child:
-            # Run Decorator tick method which will tick the child nodes.
             for node in py_trees.decorators.Decorator.tick(self):
                 yield node
         else:
-            # Run passthrough tick method defined by the default Behaviour tick.
             for node in py_trees.behaviour.Behaviour.tick(self):
                 yield node
 
     def update(self):
         if self._run_child:
             if self.decorated.status != py_trees.common.Status.RUNNING:
-                self._reset()
+                self._run_child = False
             return self.decorated.status
         else:
-            self._reset()
+            self._run_child = False
             return self._ret_status_on_failure
-
-    def _reset(self):
-        self._run_child = False
-        self._initialized = False

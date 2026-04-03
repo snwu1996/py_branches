@@ -79,10 +79,10 @@ def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], co
                 behavior_a will run 3 times in a row, behavior_b will run 2 times in a row, and
                 behavior_c will run 4 times in a row before repeating.
     '''
-    assert 0 not in counts, \
-        f'counts({counts}) can not have 0 in the list.'
-    assert len(counts) == len(behaviors), \
-        'len(counts) != len(behaviors), two lists must be of same length.'
+    if 0 in counts:
+        raise ValueError(f'counts({counts}) can not have 0 in the list.')
+    if len(counts) != len(behaviors):
+        raise ValueError('len(counts) != len(behaviors), two lists must be of same length.')
 
     alternating_behaviors = []
     for idx, behavior in enumerate(behaviors):
@@ -122,10 +122,12 @@ class RunEveryRange(py_trees.decorators.Decorator):
                        max_range: int,
                        run_range: Tuple[int, int],
                        success_if_skip: bool = False):
-        assert run_range[0] <= run_range[1], \
-            'run_range must be a tuple with (smaller_number, bigger_number)'
-        assert 1 <= run_range[0], 'Lower run range must be greater or equal to 1'
-        assert run_range[0] <= max_range, f'Upper run range must be lower or equal to {max_range}'
+        if run_range[0] > run_range[1]:
+            raise ValueError('run_range must be a tuple with (smaller_number, bigger_number)')
+        if run_range[0] < 1:
+            raise ValueError('Lower run range must be greater or equal to 1')
+        if run_range[1] > max_range:
+            raise ValueError(f'Upper run range must be lower or equal to {max_range}')
 
         super(RunEveryRange, self).__init__(name=name, child=child)
         self._max_range = max_range
@@ -184,9 +186,10 @@ class RunEveryX(py_trees.decorators.Decorator):
                        name: str,
                        every_x_range: Tuple[int, int],
                        success_if_skip:bool=False):
-        assert every_x_range[0] <= every_x_range[1], \
-            'every_x_range must be a tuple with (smaller_number, bigger_number)'
-        assert every_x_range[0] > 0, 'Can not have range be lower than 1.'
+        if every_x_range[0] > every_x_range[1]:
+            raise ValueError('every_x_range must be a tuple with (smaller_number, bigger_number)')
+        if every_x_range[0] < 1:
+            raise ValueError('Can not have range be lower than 1.')
 
         super(RunEveryX, self).__init__(name=name, child=child)
         self._every_x_range = every_x_range

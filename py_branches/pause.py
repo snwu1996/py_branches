@@ -6,7 +6,6 @@ import datetime
 import random
 import yaml
 import os
-import numpy as np
 from typing import Dict
 from typing import List
 
@@ -22,7 +21,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
         self._low = low
 
     def initialise(self):
-        self._pause_t = np.random.uniform(self._low, self._high)
+        self._pause_t = random.uniform(self._low, self._high)
         self._start_t = time.time()
 
     def update(self):
@@ -33,7 +32,8 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.SUCCESS
 
 def load_schedule_file(schedule_filepath: str):
-    assert os.path.isfile(schedule_filepath), f'schedule_filepath: {schedule_filepath} is not a valid file'
+    if not os.path.isfile(schedule_filepath):
+        raise FileNotFoundError(f'schedule_filepath: {schedule_filepath} is not a valid file')
     
     with open(schedule_filepath, 'r') as schedule_file:
         schedule_raw = yaml.safe_load(schedule_file)
@@ -58,26 +58,35 @@ class CheckPauseSchedule(py_trees.behaviour.Behaviour):
 
     def update(self):
         now_time = datetime.datetime.now().time()
+        matched_schedule_idx = None
         for idx, schedule_element in enumerate(self._schedule):
-            if idx == self._last_schedule_idx:
-                continue
-
             start = schedule_element['start_plus_variance_time']
             stop = schedule_element['stop_plus_variance_time']
             if (start < stop and start < now_time < stop) or \
                (start > stop and (now_time > start or now_time < stop)):
-                self._last_schedule_idx = idx
-                return py_trees.common.Status.SUCCESS
-        return py_trees.common.Status.FAILURE
+                matched_schedule_idx = idx
+                break
 
-def datetime_time_to_sec(time: datetime.time):
-    sec = time.hour*HOUR2SEC+time.minute*MIN2SEC+time.second
+        # Re-arm once we've left all windows.
+        if matched_schedule_idx is None:
+            self._last_schedule_idx = None
+            return py_trees.common.Status.FAILURE
+
+        # Prevent repeated SUCCESS ticks while remaining in the same window.
+        if matched_schedule_idx == self._last_schedule_idx:
+            return py_trees.common.Status.FAILURE
+
+        self._last_schedule_idx = matched_schedule_idx
+        return py_trees.common.Status.SUCCESS
+
+def datetime_time_to_sec(t: datetime.time):
+    sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
     return sec
-    
-def add_variance_to_datetime_time(time: datetime.time, variance_time: datetime.time) -> datetime.time:
+
+def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time) -> datetime.time:
     variance_sec = datetime_time_to_sec(variance_time)
     variance_timedelta = datetime.timedelta(seconds=random.uniform(0.0, variance_sec))
-    time_to_datetime = datetime.datetime.combine(datetime.date.today(), time)
+    time_to_datetime = datetime.datetime.combine(datetime.date.today(), t)
     time_with_variance = (time_to_datetime + variance_timedelta).time()
     return time_with_variance
 
