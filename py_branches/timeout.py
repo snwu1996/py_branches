@@ -25,8 +25,8 @@ class Timeout(py_trees.decorators.Decorator):
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,
                        duration: float):
-        assert duration > 0.0, \
-            f'duration({duration}) must be positive.'
+        if duration <= 0.0:
+            raise ValueError(f'duration({duration}) must be positive.')
         super(Timeout, self).__init__(name=name, child=child)
         self._duration = duration
         self._start_time = None

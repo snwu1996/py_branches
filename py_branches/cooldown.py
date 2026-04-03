@@ -33,8 +33,8 @@ class Cooldown(py_trees.decorators.Decorator):
                        name: str,
                        duration: float,
                        success_if_cooling: bool = False):
-        assert duration > 0.0, \
-            f'duration({duration}) must be positive.'
+        if duration <= 0.0:
+            raise ValueError(f'duration({duration}) must be positive.')
         super(Cooldown, self).__init__(name=name, child=child)
         self._duration = duration
         self._success_if_cooling = success_if_cooling

@@ -30,10 +30,10 @@ class Retry(py_trees.decorators.Decorator):
                        name: str,
                        max_attempts: int,
                        delay: float = 0.0):
-        assert max_attempts > 0, \
-            f'max_attempts({max_attempts}) must be greater than 0.'
-        assert delay >= 0.0, \
-            f'delay({delay}) must be non-negative.'
+        if max_attempts < 1:
+            raise ValueError(f'max_attempts({max_attempts}) must be greater than 0.')
+        if delay < 0.0:
+            raise ValueError(f'delay({delay}) must be non-negative.')
         super(Retry, self).__init__(name=name, child=child)
         self._max_attempts = max_attempts
         self._delay = delay

@@ -35,8 +35,8 @@ class Counter(py_trees.decorators.Decorator):
                        name: str,
                        num_runs: int,
                        completion_status: py_trees.common.Status = py_trees.common.Status.SUCCESS):
-        assert num_runs > 0, \
-            f'num_runs({num_runs}) must be greater than 0.'
+        if num_runs < 1:
+            raise ValueError(f'num_runs({num_runs}) must be greater than 0.')
         super(Counter, self).__init__(name=name, child=child)
         self._num_runs = num_runs
         self._completion_status = completion_status
