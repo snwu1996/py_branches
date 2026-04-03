@@ -21,7 +21,7 @@ def _tick_and_check_status(behavior, expected_status_list):
 def test_increment_blackboard_variable():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
-    set_foo = py_trees.behaviours.SetBlackboardVariable("Set Foo", "foo", 1, True)
+    set_foo = py_trees.behaviours.SetBlackboardVariable("foo", 1, True, "Set Foo")
     set_foo.tick_once()
     assert(blackboard.exists("foo"))
     assert(blackboard.foo == 1)
@@ -129,7 +129,7 @@ def test_run_if_blackboard_variable_equals():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
     blackboard.foo = 123.0
-    count = py_trees.behaviours.TickCounter('tick_counter', 3, py_trees.common.Status.SUCCESS)
+    count = py_trees.behaviours.TickCounter(3, 'tick_counter', py_trees.common.Status.SUCCESS)
 
     # Normal operations
     ribve = _create_ribve(count, 'foo', 123.0, True)

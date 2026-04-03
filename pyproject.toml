@@ -1,30 +1,30 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "py_branches"
-version = "1.0.0"
-authors = [
-  { name="Shunong Wu", email="shunongwu@gmail.com" },
-]
-description = "Useful behaviors built on top of the the py_trees library."
+version = "1.2.0"
+description = "Useful behaviors built on top of the py_trees library."
+authors = ["Shunong Wu <shunongwu@gmail.com>"]
+license = "BSD"
 readme = "README.md"
-requires-python = ">=3.8"
+homepage = "https://github.com/snwu1996/py_branches"
+repository = "https://github.com/snwu1996/py_branches"
 classifiers = [
-    'Environment :: Console',
-    'Intended Audience :: Developers',
-    'License :: OSI Approved :: BSD License',
-    'Programming Language :: Python',
-    'Topic :: Scientific/Engineering :: Artificial Intelligence',
-    'Topic :: Software Development :: Libraries'
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
 ]
-dependencies = ["py-trees",
-                "pyyaml"]
+packages = [{ include = "py_branches" }]
 
-[project.optional-dependencies]
-dev = ["pytest"]
+[tool.poetry.dependencies]
+python = ">=3.8"
+py-trees = "*"
+pyyaml = "*"
 
-[project.urls]
-Homepage = "https://github.com/snwu1996/py_branches"
-Issues = "https://github.com/snwu1996/py_branches/issues"
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
