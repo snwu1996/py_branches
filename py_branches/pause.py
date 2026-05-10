@@ -50,35 +50,6 @@ def load_schedule_file(schedule_filepath: str):
                          'stop_plus_variance_time': add_variance_to_datetime_time(stop_pause_time, variance_time)})
     return schedule
 
-class CheckPauseSchedule(py_trees.behaviour.Behaviour):
-    def __init__(self, name: str, schedule):
-        self._schedule = schedule
-        self._last_schedule_idx = None
-        super(CheckPauseSchedule, self).__init__(name=name)
-
-    def update(self):
-        now_time = datetime.datetime.now().time()
-        matched_schedule_idx = None
-        for idx, schedule_element in enumerate(self._schedule):
-            start = schedule_element['start_plus_variance_time']
-            stop = schedule_element['stop_plus_variance_time']
-            if (start < stop and start < now_time < stop) or \
-               (start > stop and (now_time > start or now_time < stop)):
-                matched_schedule_idx = idx
-                break
-
-        # Re-arm once we've left all windows.
-        if matched_schedule_idx is None:
-            self._last_schedule_idx = None
-            return py_trees.common.Status.FAILURE
-
-        # Prevent repeated SUCCESS ticks while remaining in the same window.
-        if matched_schedule_idx == self._last_schedule_idx:
-            return py_trees.common.Status.FAILURE
-
-        self._last_schedule_idx = matched_schedule_idx
-        return py_trees.common.Status.SUCCESS
-
 def datetime_time_to_sec(t: datetime.time):
     sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
     return sec
@@ -93,6 +64,7 @@ def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time
 class PauseSchedule(py_trees.behaviour.Behaviour):
     def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
         self._schedule = schedule
+        self._last_schedule_idx = None
         super(PauseSchedule, self).__init__(name=name)
 
     def initialise(self):
@@ -100,28 +72,43 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         self._t_wait = None
         self._t_start = time.time()
         now_time = datetime.datetime.now().time()
-        for schedule_element in self._schedule:
+        matched_idx = None
+        for idx, schedule_element in enumerate(self._schedule):
             start = schedule_element['start_plus_variance_time']
             stop = schedule_element['stop_plus_variance_time']
-            variance = schedule_element['variance_time']
             if (start < stop and start < now_time < stop) or \
                (start > stop and (now_time > start or now_time < stop)):
-                if now_time < stop:
-                    self._t_wait = datetime_time_to_sec(stop) - \
-                                   datetime_time_to_sec(now_time)
-                else:
-                    self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
-                                   datetime_time_to_sec(now_time) + \
-                                   datetime_time_to_sec(stop)
-                self._t_start = time.time()
-                logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
-                schedule_element['start_plus_variance_time'] = \
-                    add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
-                schedule_element['stop_plus_variance_time'] = \
-                    add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
-                logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
-                logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
+                matched_idx = idx
                 break
+
+        # Re-arm once we've left all windows.
+        if matched_idx is None:
+            self._last_schedule_idx = None
+            return
+
+        # Don't re-pause for the same window we already handled.
+        if matched_idx == self._last_schedule_idx:
+            return
+
+        self._last_schedule_idx = matched_idx
+        schedule_element = self._schedule[matched_idx]
+        stop = schedule_element['stop_plus_variance_time']
+        variance = schedule_element['variance_time']
+        if now_time < stop:
+            self._t_wait = datetime_time_to_sec(stop) - \
+                           datetime_time_to_sec(now_time)
+        else:
+            self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
+                           datetime_time_to_sec(now_time) + \
+                           datetime_time_to_sec(stop)
+        self._t_start = time.time()
+        logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
+        schedule_element['start_plus_variance_time'] = \
+            add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
+        schedule_element['stop_plus_variance_time'] = \
+            add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
+        logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
+        logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
 
     def update(self):
         if self._t_wait is None:

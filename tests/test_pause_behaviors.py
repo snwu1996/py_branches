@@ -6,7 +6,6 @@ import random
 
 from py_branches.pause import PauseUniform
 from py_branches.pause import PauseSchedule
-from py_branches.pause import CheckPauseSchedule
 
 
 def test_pause_uniform():
@@ -23,36 +22,50 @@ def test_pause_uniform():
     assert (0.2 < t_elapse < 0.5)
 
 
-def test_check_pause_schedule_rearms_after_window_end():
+def test_pause_schedule_rearms_after_window_end():
     now = datetime.datetime.now().time()
+    one_second_ago = (datetime.datetime.combine(datetime.date.today(), now) -
+                      datetime.timedelta(seconds=1)).time()
+    one_second_later = (datetime.datetime.combine(datetime.date.today(), now) +
+                        datetime.timedelta(seconds=1)).time()
     one_minute_ago = (datetime.datetime.combine(datetime.date.today(), now) -
                       datetime.timedelta(minutes=1)).time()
     one_minute_later = (datetime.datetime.combine(datetime.date.today(), now) +
                         datetime.timedelta(minutes=1)).time()
 
     schedule = [{
-        'start_plus_variance_time': one_minute_ago,
-        'stop_plus_variance_time': one_minute_later,
+        'start_pause_time': one_second_ago,
+        'stop_pause_time': one_second_later,
+        'variance_time': datetime.time(0, 0, 0),
+        'start_plus_variance_time': one_second_ago,
+        'stop_plus_variance_time': one_second_later,
     }]
 
-    check_pause_schedule = CheckPauseSchedule('check_pause_schedule', schedule)
+    pause_schedule = PauseSchedule('pause_schedule', schedule)
 
-    # First tick in active window should trigger.
-    check_pause_schedule.tick_once()
-    assert check_pause_schedule.status == py_trees.common.Status.SUCCESS
+    # First tick in active window should pause (RUNNING).
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
 
-    # Second tick in same active window should not re-trigger.
-    check_pause_schedule.tick_once()
-    assert check_pause_schedule.status == py_trees.common.Status.FAILURE
+    # Wait out the window and let it complete.
+    time.sleep(1.2)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
-    # Move outside all windows, which should re-arm internal state.
-    schedule[0]['start_plus_variance_time'] = one_minute_later
-    schedule[0]['stop_plus_variance_time'] = one_minute_ago
-    check_pause_schedule.tick_once()
-    assert check_pause_schedule.status == py_trees.common.Status.FAILURE
-
-    # Move back into active window and verify it can trigger again.
+    # Re-enter the same window: should not re-pause (SUCCESS immediately).
     schedule[0]['start_plus_variance_time'] = one_minute_ago
     schedule[0]['stop_plus_variance_time'] = one_minute_later
-    check_pause_schedule.tick_once()
-    assert check_pause_schedule.status == py_trees.common.Status.SUCCESS
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.SUCCESS
+
+    # Move outside all windows to re-arm internal state.
+    schedule[0]['start_plus_variance_time'] = one_minute_later
+    schedule[0]['stop_plus_variance_time'] = one_minute_ago
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.SUCCESS
+
+    # Move back into active window: should pause again.
+    schedule[0]['start_plus_variance_time'] = one_minute_ago
+    schedule[0]['stop_plus_variance_time'] = one_minute_later
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
