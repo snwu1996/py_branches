@@ -18,7 +18,7 @@ classifiers = [
 packages = [{ include = "py_branches" }]
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10,<4.0"
 py-trees = "*"
 pyyaml = "*"
 pynput = "^1.7"

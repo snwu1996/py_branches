@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import logging
+import re
 import time
 import random
 
@@ -8,7 +10,20 @@ from py_branches.pause import PauseUniform
 from py_branches.visitors import TimerVisitor
 
 
-def test_timer_visitor_measures_pause_uniform_running_duration():
+_DURATION_RE = re.compile(r'ran for (\d+\.\d+)s')
+
+
+def _extract_duration(caplog, behaviour_name):
+    for record in caplog.records:
+        if f'[timer] {behaviour_name} ran for' in record.message:
+            match = _DURATION_RE.search(record.message)
+            if match:
+                return float(match.group(1))
+    return None
+
+
+def test_timer_visitor_measures_pause_uniform_running_duration(caplog):
+    caplog.set_level(logging.INFO, logger='py_branches.visitors')
     random.seed(0)
     pause = PauseUniform('pause', 0.2, 0.3)
     visitor = TimerVisitor()
@@ -20,22 +35,24 @@ def test_timer_visitor_measures_pause_uniform_running_duration():
             break
         time.sleep(0.01)
 
-    duration = visitor.get_duration(pause)
+    duration = _extract_duration(caplog, 'pause')
     assert duration is not None
     assert 0.15 < duration < 0.45, f'duration={duration}'
 
 
-def test_timer_visitor_returns_none_for_never_running_behaviour():
+def test_timer_visitor_does_not_log_for_never_running_behaviour(caplog):
+    caplog.set_level(logging.INFO, logger='py_branches.visitors')
     success = py_trees.behaviours.Success('s')
     visitor = TimerVisitor()
 
     success.tick_once()
     visitor.run(success)
 
-    assert visitor.get_duration(success) is None
+    assert _extract_duration(caplog, 's') is None
 
 
-def test_timer_visitor_accumulates_across_running_ticks():
+def test_timer_visitor_accumulates_across_running_ticks(caplog):
+    caplog.set_level(logging.INFO, logger='py_branches.visitors')
     counter = py_trees.behaviours.TickCounter('tc', 3, py_trees.common.Status.SUCCESS)
     visitor = TimerVisitor()
 
@@ -47,13 +64,14 @@ def test_timer_visitor_accumulates_across_running_ticks():
             break
         time.sleep(sleep_per_tick)
 
-    duration = visitor.get_duration(counter)
+    duration = _extract_duration(caplog, 'tc')
     assert duration is not None
     # Three RUNNING ticks separated by ~0.1s sleeps -> ~0.3s.
     assert 0.25 < duration < 0.5, f'duration={duration}'
 
 
-def test_timer_visitor_integrates_with_behaviour_tree():
+def test_timer_visitor_integrates_with_behaviour_tree(caplog):
+    caplog.set_level(logging.INFO, logger='py_branches.visitors')
     random.seed(1)
     pause = PauseUniform('pause', 0.1, 0.2)
     tree = py_trees.trees.BehaviourTree(pause)
@@ -66,6 +84,6 @@ def test_timer_visitor_integrates_with_behaviour_tree():
             break
         time.sleep(0.01)
 
-    duration = visitor.get_duration(pause)
+    duration = _extract_duration(caplog, 'pause')
     assert duration is not None
     assert 0.05 < duration < 0.35, f'duration={duration}'
