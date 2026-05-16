@@ -30,7 +30,7 @@ class StatusTransitionVisitor(py_trees.visitors.VisitorBase):
     ) -> None:
         super().__init__(full=True)
         self._last: Dict[str, py_trees.common.Status] = {}
-        self._logger = logger
+        self._logger = logger if logger is not None else logging.getLogger(__name__)
         self._level = level
 
     def run(self, behaviour: py_trees.behaviour.Behaviour) -> None:
@@ -46,10 +46,7 @@ class StatusTransitionVisitor(py_trees.visitors.VisitorBase):
             return
         color = _ANSI_BY_STATUS.get(curr, '')
         msg = f'{color}[{behaviour.name}] {curr.name}{_ANSI_RESET}'
-        if self._logger is not None:
-            self._logger.log(self._level, msg)
-        else:
-            print(msg, flush=True)
+        self._logger.log(self._level, msg)
 
 
 class TimerVisitor(py_trees.visitors.VisitorBase):
@@ -60,11 +57,19 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
     duplicate names in a tree are handled correctly.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        log_on_transition: bool = True,
+        logger: Optional[logging.Logger] = None,
+        level: int = logging.INFO,
+    ) -> None:
         super().__init__(full=False)
         self._running_starts: Dict[uuid.UUID, float] = {}
         self.durations: Dict[uuid.UUID, float] = {}
         self.behaviour_names: Dict[uuid.UUID, str] = {}
+        self._log = log_on_transition
+        self._logger = logger if logger is not None else logging.getLogger(__name__)
+        self._level = level
 
     def run(self, behaviour: py_trees.behaviour.Behaviour) -> None:
         self.behaviour_names[behaviour.id] = behaviour.name
@@ -74,7 +79,10 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
             self._running_starts[behaviour.id] = time.time()
         elif not is_running and behaviour.id in self._running_starts:
             start = self._running_starts.pop(behaviour.id)
-            self.durations[behaviour.id] = time.time() - start
+            duration = time.time() - start
+            self.durations[behaviour.id] = duration
+            if self._log:
+                self._logger.log(self._level, f'[timer] {behaviour.name} ran for {duration:.3f}s')
 
     def get_duration(self, behaviour: py_trees.behaviour.Behaviour) -> Optional[float]:
         """Return the last completed RUNNING duration, or current elapsed if still running."""
