@@ -34,11 +34,8 @@ jobs:
       - name: Verify build artifacts
         run: ls -la dist/
 
-      - name: Install system deps for pynput
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-
       - name: Install dependencies
         run: poetry install --with dev
 
       - name: Run tests
-        run: xvfb-run -a poetry run pytest tests/ -v
+        run: poetry run pytest tests/ -v

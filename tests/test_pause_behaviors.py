@@ -26,6 +26,12 @@ class FakeKeyboardListener:
         self.stopped = True
 
 
+class FakeKey:
+    def __init__(self, char=None, name=None):
+        self.char = char
+        self.name = name
+
+
 def _write_floats(path, values):
     path.write_text('\n'.join(str(v) for v in values) + '\n')
 
@@ -133,8 +139,6 @@ def test_pause_schedule_rearms_after_window_end():
 
 
 def test_pause_until_key():
-    from pynput.keyboard import KeyCode, Key
-
     b = PauseUntilKey('pause_until_key', 'a', listener_factory=FakeKeyboardListener)
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
@@ -143,12 +147,12 @@ def test_pause_until_key():
     assert b.status == py_trees.common.Status.RUNNING
 
     # Wrong key: still RUNNING.
-    b._on_press(KeyCode.from_char('x'))
+    b._on_press(FakeKey(char='x'))
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
 
     # Right key: SUCCESS.
-    b._on_press(KeyCode.from_char('a'))
+    b._on_press(FakeKey(char='a'))
     b.tick_once()
     assert b.status == py_trees.common.Status.SUCCESS
     assert b._listener is None
@@ -156,7 +160,7 @@ def test_pause_until_key():
     b2 = PauseUntilKey('pause_until_space', 'space', listener_factory=FakeKeyboardListener)
     b2.tick_once()
     assert b2.status == py_trees.common.Status.RUNNING
-    b2._on_press(Key.space)
+    b2._on_press(FakeKey(name='space'))
     b2.tick_once()
     assert b2.status == py_trees.common.Status.SUCCESS
 

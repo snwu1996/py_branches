@@ -10,12 +10,17 @@ from typing import Dict
 from typing import List
 
 import numpy as np
-from pynput import keyboard
 from sklearn.neighbors import KernelDensity
 
 
 HOUR2SEC = 3600
 MIN2SEC = 60
+
+
+def _create_keyboard_listener(on_press):
+    # Import lazily so headless CI can import this module without an X server.
+    from pynput import keyboard
+    return keyboard.Listener(on_press=on_press)
 
 
 class PauseUniform(py_trees.behaviour.Behaviour):
@@ -87,7 +92,7 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
     ``pynput.keyboard.Key`` names).
     """
 
-    def __init__(self, name: str, key: str, listener_factory=keyboard.Listener):
+    def __init__(self, name: str, key: str, listener_factory=_create_keyboard_listener):
         super(PauseUntilKey, self).__init__(name=name)
         self._key = key
         self._listener_factory = listener_factory
