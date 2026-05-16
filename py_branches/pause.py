@@ -9,6 +9,8 @@ import os
 from typing import Dict
 from typing import List
 
+from pynput import keyboard
+
 
 HOUR2SEC = 3600
 MIN2SEC = 60
@@ -30,6 +32,52 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.RUNNING
         else:
             return py_trees.common.Status.SUCCESS
+
+class PauseUntilKey(py_trees.behaviour.Behaviour):
+    """Pause (RUNNING) until the configured key is pressed, then SUCCESS.
+
+    ``key`` is a pynput key string: a single character like ``'a'``, or a
+    special key name like ``'space'``, ``'enter'``, ``'esc'`` (matching
+    ``pynput.keyboard.Key`` names).
+    """
+
+    def __init__(self, name: str, key: str):
+        super(PauseUntilKey, self).__init__(name=name)
+        self._key = key
+        self._listener = None
+        self._pressed = False
+
+    def _matches(self, key) -> bool:
+        char = getattr(key, 'char', None)
+        if char is not None and char == self._key:
+            return True
+        name = getattr(key, 'name', None)
+        if name is not None and name == self._key:
+            return True
+        return False
+
+    def _on_press(self, key):
+        if self._matches(key):
+            self._pressed = True
+            return False
+
+    def initialise(self):
+        self._pressed = False
+        if self._listener is not None:
+            self._listener.stop()
+        self._listener = keyboard.Listener(on_press=self._on_press)
+        self._listener.start()
+
+    def update(self):
+        if self._pressed:
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.RUNNING
+
+    def terminate(self, new_status):
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
+
 
 def load_schedule_file(schedule_filepath: str):
     if not os.path.isfile(schedule_filepath):

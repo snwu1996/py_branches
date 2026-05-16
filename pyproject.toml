@@ -21,6 +21,7 @@ packages = [{ include = "py_branches" }]
 python = ">=3.8"
 py-trees = "*"
 pyyaml = "*"
+pynput = "^1.7"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"

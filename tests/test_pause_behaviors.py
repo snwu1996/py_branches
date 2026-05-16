@@ -6,6 +6,7 @@ import random
 
 from py_branches.pause import PauseUniform
 from py_branches.pause import PauseSchedule
+from py_branches.pause import PauseUntilKey
 
 
 def test_pause_uniform():
@@ -108,3 +109,30 @@ def test_pause_schedule_rearms_after_window_end():
     schedule[0]['stop_plus_variance_time'] = one_minute_later
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.RUNNING
+
+
+def test_pause_until_key():
+    from pynput.keyboard import KeyCode, Key
+
+    b = PauseUntilKey('pause_until_key', 'a')
+    b.tick_once()
+    assert b.status == py_trees.common.Status.RUNNING
+    b.tick_once()
+    assert b.status == py_trees.common.Status.RUNNING
+
+    # Wrong key: still RUNNING.
+    b._on_press(KeyCode.from_char('x'))
+    b.tick_once()
+    assert b.status == py_trees.common.Status.RUNNING
+
+    # Right key: SUCCESS.
+    b._on_press(KeyCode.from_char('a'))
+    b.tick_once()
+    assert b.status == py_trees.common.Status.SUCCESS
+
+    b2 = PauseUntilKey('pause_until_space', 'space')
+    b2.tick_once()
+    assert b2.status == py_trees.common.Status.RUNNING
+    b2._on_press(Key.space)
+    b2.tick_once()
+    assert b2.status == py_trees.common.Status.SUCCESS
