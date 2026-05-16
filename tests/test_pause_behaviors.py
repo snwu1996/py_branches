@@ -4,9 +4,17 @@ import time
 import datetime
 import random
 
+import numpy as np
+import pytest
+
 from py_branches.pause import PauseUniform
 from py_branches.pause import PauseSchedule
+from py_branches.pause import PausePDF
 from py_branches.pause import PauseUntilKey
+
+
+def _write_floats(path, values):
+    path.write_text('\n'.join(str(v) for v in values) + '\n')
 
 
 def test_pause_uniform():
@@ -136,3 +144,58 @@ def test_pause_until_key():
     b2._on_press(Key.space)
     b2.tick_once()
     assert b2.status == py_trees.common.Status.SUCCESS
+
+
+def test_pause_pdf_runs_until_elapsed(tmp_path):
+    fp = tmp_path / 'waits.txt'
+    _write_floats(fp, [0.25] * 30)
+    pause = PausePDF('pause_pdf', str(fp), kernel_bandwidth=0.01, min_t=0.1, max_t=0.5)
+    start_ts = time.time()
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.RUNNING
+    while pause.status == py_trees.common.Status.RUNNING:
+        time.sleep(0.01)
+        pause.tick_once()
+    t_elapse = time.time() - start_ts
+    assert pause.status == py_trees.common.Status.SUCCESS
+    assert 0.1 <= t_elapse <= 0.5
+
+
+def test_pause_pdf_resamples_each_initialise(tmp_path):
+    fp = tmp_path / 'waits.txt'
+    _write_floats(fp, np.linspace(0.2, 1.0, 50).tolist())
+    pause = PausePDF('pause_pdf', str(fp), kernel_bandwidth=0.05, min_t=0.0, max_t=2.0)
+    samples = []
+    for _ in range(5):
+        pause.initialise()
+        samples.append(pause._pause_t)
+    assert len(set(samples)) > 1
+
+
+def test_pause_pdf_respects_bounds(tmp_path):
+    fp = tmp_path / 'waits.txt'
+    _write_floats(fp, np.linspace(0.5, 2.5, 40).tolist())
+    pause = PausePDF('pause_pdf', str(fp), kernel_bandwidth=0.3, min_t=1.0, max_t=2.0)
+    for _ in range(20):
+        pause.initialise()
+        assert 1.0 <= pause._pause_t <= 2.0
+
+
+def test_pause_pdf_ignores_blank_and_comment_lines(tmp_path):
+    fp = tmp_path / 'waits.txt'
+    fp.write_text('# header\n0.3\n\n0.4\n# trailing\n0.5\n')
+    pause = PausePDF('pause_pdf', str(fp), kernel_bandwidth=0.1, min_t=0.0, max_t=10.0)
+    pause.initialise()
+    assert pause._pause_t > 0
+
+
+def test_pause_pdf_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        PausePDF('pause_pdf', str(tmp_path / 'nope.txt'))
+
+
+def test_pause_pdf_empty_file_raises(tmp_path):
+    fp = tmp_path / 'waits.txt'
+    fp.write_text('# only a comment\n\n')
+    with pytest.raises(AssertionError):
+        PausePDF('pause_pdf', str(fp))

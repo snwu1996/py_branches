@@ -22,6 +22,8 @@ python = ">=3.8"
 py-trees = "*"
 pyyaml = "*"
 pynput = "^1.7"
+numpy = "*"
+scikit-learn = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"

@@ -9,7 +9,9 @@ import os
 from typing import Dict
 from typing import List
 
+import numpy as np
 from pynput import keyboard
+from sklearn.neighbors import KernelDensity
 
 
 HOUR2SEC = 3600
@@ -32,6 +34,50 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.RUNNING
         else:
             return py_trees.common.Status.SUCCESS
+
+class PausePDF(py_trees.behaviour.Behaviour):
+    """Pause for a duration sampled from a KDE fit to a file of float samples."""
+
+    def __init__(
+        self,
+        name: str,
+        filepath: str,
+        kernel_bandwidth: float = 1.0,
+        min_t: float = 0.0,
+        max_t: float = float('inf'),
+    ):
+        super(PausePDF, self).__init__(name=name)
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f'filepath: {filepath} is not a valid file')
+
+        samples = []
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                samples.append(float(line))
+        assert len(samples), f'filepath: {filepath} contains no float samples'
+
+        self._min_t = min_t
+        self._max_t = max_t
+        self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel='gaussian')
+        self._model.fit(np.asarray(samples).reshape(-1, 1))
+
+    def initialise(self):
+        t_wait = self._min_t - 1.0
+        while not (self._min_t <= t_wait <= self._max_t):
+            t_wait = float(self._model.sample(1)[0][0])
+        self._pause_t = t_wait
+        self._start_t = time.time()
+        self.logger.debug(f'{self.name} sampled pause {self._pause_t:.3f} sec')
+
+    def update(self):
+        t_elapse = time.time() - self._start_t
+        if t_elapse < self._pause_t:
+            return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
+
 
 class PauseUntilKey(py_trees.behaviour.Behaviour):
     """Pause (RUNNING) until the configured key is pressed, then SUCCESS.
