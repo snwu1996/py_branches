@@ -23,7 +23,7 @@ def _tick_and_check_status(behavior, expected_status_list):
 def test_increment_blackboard_variable():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
-    set_foo = py_trees.behaviours.SetBlackboardVariable("foo", 1, True, "Set Foo")
+    set_foo = py_trees.behaviours.SetBlackboardVariable(name="Set Foo", variable_name="foo", variable_value=1, overwrite=True)
     set_foo.tick_once()
     assert(blackboard.exists("foo"))
     assert(blackboard.foo == 1)
