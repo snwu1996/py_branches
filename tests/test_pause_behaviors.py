@@ -13,6 +13,19 @@ from py_branches.pause import PausePDF
 from py_branches.pause import PauseUntilKey
 
 
+class FakeKeyboardListener:
+    def __init__(self, on_press):
+        self.on_press = on_press
+        self.started = False
+        self.stopped = False
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        self.stopped = True
+
+
 def _write_floats(path, values):
     path.write_text('\n'.join(str(v) for v in values) + '\n')
 
@@ -122,9 +135,10 @@ def test_pause_schedule_rearms_after_window_end():
 def test_pause_until_key():
     from pynput.keyboard import KeyCode, Key
 
-    b = PauseUntilKey('pause_until_key', 'a')
+    b = PauseUntilKey('pause_until_key', 'a', listener_factory=FakeKeyboardListener)
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
+    assert b._listener.started
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
 
@@ -137,8 +151,9 @@ def test_pause_until_key():
     b._on_press(KeyCode.from_char('a'))
     b.tick_once()
     assert b.status == py_trees.common.Status.SUCCESS
+    assert b._listener is None
 
-    b2 = PauseUntilKey('pause_until_space', 'space')
+    b2 = PauseUntilKey('pause_until_space', 'space', listener_factory=FakeKeyboardListener)
     b2.tick_once()
     assert b2.status == py_trees.common.Status.RUNNING
     b2._on_press(Key.space)

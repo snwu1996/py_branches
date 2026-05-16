@@ -87,9 +87,10 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
     ``pynput.keyboard.Key`` names).
     """
 
-    def __init__(self, name: str, key: str):
+    def __init__(self, name: str, key: str, listener_factory=keyboard.Listener):
         super(PauseUntilKey, self).__init__(name=name)
         self._key = key
+        self._listener_factory = listener_factory
         self._listener = None
         self._pressed = False
 
@@ -111,7 +112,7 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
         self._pressed = False
         if self._listener is not None:
             self._listener.stop()
-        self._listener = keyboard.Listener(on_press=self._on_press)
+        self._listener = self._listener_factory(on_press=self._on_press)
         self._listener.start()
 
     def update(self):
