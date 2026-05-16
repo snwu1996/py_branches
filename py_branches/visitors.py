@@ -59,20 +59,14 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
 
     def __init__(
         self,
-        log_on_transition: bool = True,
-        logger: Optional[logging.Logger] = None,
         level: int = logging.INFO,
     ) -> None:
         super().__init__(full=False)
         self._running_starts: Dict[uuid.UUID, float] = {}
-        self.durations: Dict[uuid.UUID, float] = {}
-        self.behaviour_names: Dict[uuid.UUID, str] = {}
-        self._log = log_on_transition
-        self._logger = logger if logger is not None else logging.getLogger(__name__)
+        self._logger = logging.getLogger(__name__)
         self._level = level
 
     def run(self, behaviour: py_trees.behaviour.Behaviour) -> None:
-        self.behaviour_names[behaviour.id] = behaviour.name
         is_running = behaviour.status == py_trees.common.Status.RUNNING
 
         if is_running and behaviour.id not in self._running_starts:
@@ -80,15 +74,7 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
         elif not is_running and behaviour.id in self._running_starts:
             start = self._running_starts.pop(behaviour.id)
             duration = time.time() - start
-            self.durations[behaviour.id] = duration
-            if self._log:
-                self._logger.log(self._level, f'[timer] {behaviour.name} ran for {duration:.3f}s')
-
-    def get_duration(self, behaviour: py_trees.behaviour.Behaviour) -> Optional[float]:
-        """Return the last completed RUNNING duration, or current elapsed if still running."""
-        if behaviour.id in self._running_starts:
-            return time.time() - self._running_starts[behaviour.id]
-        return self.durations.get(behaviour.id)
+            self._logger.log(self._level, f'[timer] {behaviour.name} ran for {duration:.3f}s')
 
 
 __all__ = ['StatusTransitionVisitor', 'TimerVisitor']
