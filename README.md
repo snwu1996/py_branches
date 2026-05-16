@@ -95,14 +95,12 @@ pause = PauseUniform(name="RandomPause", low=1.0, high=3.0)
 ### Pause — schedule-based pause
 
 ```python
-from py_branches.pause import load_schedule_file, CheckPauseSchedule, PauseSchedule
+from py_branches.pause import load_schedule_file, PauseSchedule
 
 schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
 
-# Returns SUCCESS when the current time falls inside a scheduled window
-check = CheckPauseSchedule(name="CheckSchedule", schedule=schedule)
-
-# Pauses until the current scheduled window ends
+# Pauses until the current scheduled window ends; SUCCESS immediately if
+# outside all windows.
 pause = PauseSchedule(name="PauseSchedule", schedule=schedule)
 ```
 
