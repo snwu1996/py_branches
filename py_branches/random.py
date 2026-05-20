@@ -127,5 +127,5 @@ def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabi
 
     logging.debug(f'behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}')
 
-    selector = py_trees.composites.Selector(name, False, children)
+    selector = py_trees.composites.Selector(name, True, children)
     return selector
