@@ -7,11 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +27,12 @@ jobs:
           version: 1.8.2
           virtualenvs-create: true
           virtualenvs-in-project: true
+
+      - name: Build package
+        run: poetry build
+
+      - name: Verify build artifacts
+        run: ls -la dist/
 
       - name: Install dependencies
         run: poetry install --with dev

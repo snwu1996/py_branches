@@ -5,6 +5,8 @@ from py_branches.blackboard import IncrementBlackboardVariable
 from py_branches.blackboard import IncrementBlackboardVariableIfCondition
 from py_branches.blackboard import SetBlackboardVariableIfCondition
 from py_branches.blackboard import RunIfBlackboardVariableEquals
+from py_branches.blackboard import RunIfBlackboardVariableLessThan
+from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
 
 
 _r = py_trees.common.Status.RUNNING
@@ -21,7 +23,7 @@ def _tick_and_check_status(behavior, expected_status_list):
 def test_increment_blackboard_variable():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
-    set_foo = py_trees.behaviours.SetBlackboardVariable("foo", 1, True, "Set Foo")
+    set_foo = py_trees.behaviours.SetBlackboardVariable(name="Set Foo", variable_name="foo", variable_value=1, overwrite=True)
     set_foo.tick_once()
     assert(blackboard.exists("foo"))
     assert(blackboard.foo == 1)
@@ -129,7 +131,7 @@ def test_run_if_blackboard_variable_equals():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
     blackboard.foo = 123.0
-    count = py_trees.behaviours.TickCounter(3, 'tick_counter', py_trees.common.Status.SUCCESS)
+    count = py_trees.behaviours.TickCounter('tick_counter', 3, py_trees.common.Status.SUCCESS)
 
     # Normal operations
     ribve = _create_ribve(count, 'foo', 123.0, True)
@@ -156,3 +158,75 @@ def test_run_if_blackboard_variable_equals():
     # Blackboard variable doesn't exist, skip behavior, always return success.
     ribve = _create_ribve(count, 'bar', 0.0, True)
     _tick_and_check_status(ribve, [_s, _s])
+
+
+def test_run_if_blackboard_variable_less_than():
+    def _create_riblt(child, bb_var, less_than, success_if_skip):
+        return RunIfBlackboardVariableLessThan(child, 'run_if_blackboard_variable_less_than',
+            bb_var, less_than, success_if_skip)
+
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
+    blackboard.foo = 5.0
+    count = py_trees.behaviours.TickCounter('tick_counter', 3, py_trees.common.Status.SUCCESS)
+
+    # 5.0 < 10.0, child runs.
+    riblt = _create_riblt(count, 'foo', 10.0, True)
+    _tick_and_check_status(riblt, [_r, _r, _r, _s])
+    assert(count.counter == 4)
+
+    # 5.0 not < 5.0, skip with success.
+    count.counter = 0
+    riblt = _create_riblt(count, 'foo', 5.0, True)
+    _tick_and_check_status(riblt, [_s, _s])
+    assert(count.counter == 0)
+
+    # 5.0 not < 1.0, skip with failure.
+    riblt = _create_riblt(count, 'foo', 1.0, False)
+    _tick_and_check_status(riblt, [_f, _f])
+    assert(count.counter == 0)
+
+    # Variable updated to satisfy condition.
+    blackboard.foo = 0.0
+    _tick_and_check_status(riblt, [_r, _r, _r, _s])
+    assert(count.counter == 4)
+
+    # Missing variable, skip with success.
+    riblt = _create_riblt(count, 'missing_lt_var', 0.0, True)
+    _tick_and_check_status(riblt, [_s, _s])
+
+
+def test_run_if_blackboard_variable_greater_than():
+    def _create_ribgt(child, bb_var, greater_than, success_if_skip):
+        return RunIfBlackboardVariableGreaterThan(child, 'run_if_blackboard_variable_greater_than',
+            bb_var, greater_than, success_if_skip)
+
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key='foo', access=py_trees.common.Access.WRITE)
+    blackboard.foo = 5.0
+    count = py_trees.behaviours.TickCounter('tick_counter', 3, py_trees.common.Status.SUCCESS)
+
+    # 5.0 > 1.0, child runs.
+    ribgt = _create_ribgt(count, 'foo', 1.0, True)
+    _tick_and_check_status(ribgt, [_r, _r, _r, _s])
+    assert(count.counter == 4)
+
+    # 5.0 not > 5.0, skip with success.
+    count.counter = 0
+    ribgt = _create_ribgt(count, 'foo', 5.0, True)
+    _tick_and_check_status(ribgt, [_s, _s])
+    assert(count.counter == 0)
+
+    # 5.0 not > 10.0, skip with failure.
+    ribgt = _create_ribgt(count, 'foo', 10.0, False)
+    _tick_and_check_status(ribgt, [_f, _f])
+    assert(count.counter == 0)
+
+    # Variable updated to satisfy condition.
+    blackboard.foo = 20.0
+    _tick_and_check_status(ribgt, [_r, _r, _r, _s])
+    assert(count.counter == 4)
+
+    # Missing variable, skip with success.
+    ribgt = _create_ribgt(count, 'missing_gt_var', 0.0, True)
+    _tick_and_check_status(ribgt, [_s, _s])

@@ -9,9 +9,18 @@ import os
 from typing import Dict
 from typing import List
 
+import numpy as np
+from sklearn.neighbors import KernelDensity
+
 
 HOUR2SEC = 3600
 MIN2SEC = 60
+
+
+def _create_keyboard_listener(on_press):
+    # Import lazily so headless CI can import this module without an X server.
+    from pynput import keyboard
+    return keyboard.Listener(on_press=on_press)
 
 
 class PauseUniform(py_trees.behaviour.Behaviour):
@@ -30,6 +39,97 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.RUNNING
         else:
             return py_trees.common.Status.SUCCESS
+
+class PausePDF(py_trees.behaviour.Behaviour):
+    """Pause for a duration sampled from a KDE fit to a file of float samples."""
+
+    def __init__(
+        self,
+        name: str,
+        filepath: str,
+        kernel_bandwidth: float = 1.0,
+        min_t: float = 0.0,
+        max_t: float = float('inf'),
+    ):
+        super(PausePDF, self).__init__(name=name)
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f'filepath: {filepath} is not a valid file')
+
+        samples = []
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                samples.append(float(line))
+        assert len(samples), f'filepath: {filepath} contains no float samples'
+
+        self._min_t = min_t
+        self._max_t = max_t
+        self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel='gaussian')
+        self._model.fit(np.asarray(samples).reshape(-1, 1))
+
+    def initialise(self):
+        t_wait = self._min_t - 1.0
+        while not (self._min_t <= t_wait <= self._max_t):
+            t_wait = float(self._model.sample(1)[0][0])
+        self._pause_t = t_wait
+        self._start_t = time.time()
+        self.logger.debug(f'{self.name} sampled pause {self._pause_t:.3f} sec')
+
+    def update(self):
+        t_elapse = time.time() - self._start_t
+        if t_elapse < self._pause_t:
+            return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
+
+
+class PauseUntilKey(py_trees.behaviour.Behaviour):
+    """Pause (RUNNING) until the configured key is pressed, then SUCCESS.
+
+    ``key`` is a pynput key string: a single character like ``'a'``, or a
+    special key name like ``'space'``, ``'enter'``, ``'esc'`` (matching
+    ``pynput.keyboard.Key`` names).
+    """
+
+    def __init__(self, name: str, key: str, listener_factory=_create_keyboard_listener):
+        super(PauseUntilKey, self).__init__(name=name)
+        self._key = key
+        self._listener_factory = listener_factory
+        self._listener = None
+        self._pressed = False
+
+    def _matches(self, key) -> bool:
+        char = getattr(key, 'char', None)
+        if char is not None and char == self._key:
+            return True
+        name = getattr(key, 'name', None)
+        if name is not None and name == self._key:
+            return True
+        return False
+
+    def _on_press(self, key):
+        if self._matches(key):
+            self._pressed = True
+            return False
+
+    def initialise(self):
+        self._pressed = False
+        if self._listener is not None:
+            self._listener.stop()
+        self._listener = self._listener_factory(on_press=self._on_press)
+        self._listener.start()
+
+    def update(self):
+        if self._pressed:
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.RUNNING
+
+    def terminate(self, new_status):
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
+
 
 def load_schedule_file(schedule_filepath: str):
     if not os.path.isfile(schedule_filepath):
@@ -50,35 +150,6 @@ def load_schedule_file(schedule_filepath: str):
                          'stop_plus_variance_time': add_variance_to_datetime_time(stop_pause_time, variance_time)})
     return schedule
 
-class CheckPauseSchedule(py_trees.behaviour.Behaviour):
-    def __init__(self, name: str, schedule):
-        self._schedule = schedule
-        self._last_schedule_idx = None
-        super(CheckPauseSchedule, self).__init__(name=name)
-
-    def update(self):
-        now_time = datetime.datetime.now().time()
-        matched_schedule_idx = None
-        for idx, schedule_element in enumerate(self._schedule):
-            start = schedule_element['start_plus_variance_time']
-            stop = schedule_element['stop_plus_variance_time']
-            if (start < stop and start < now_time < stop) or \
-               (start > stop and (now_time > start or now_time < stop)):
-                matched_schedule_idx = idx
-                break
-
-        # Re-arm once we've left all windows.
-        if matched_schedule_idx is None:
-            self._last_schedule_idx = None
-            return py_trees.common.Status.FAILURE
-
-        # Prevent repeated SUCCESS ticks while remaining in the same window.
-        if matched_schedule_idx == self._last_schedule_idx:
-            return py_trees.common.Status.FAILURE
-
-        self._last_schedule_idx = matched_schedule_idx
-        return py_trees.common.Status.SUCCESS
-
 def datetime_time_to_sec(t: datetime.time):
     sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
     return sec
@@ -93,6 +164,7 @@ def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time
 class PauseSchedule(py_trees.behaviour.Behaviour):
     def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
         self._schedule = schedule
+        self._last_schedule_idx = None
         super(PauseSchedule, self).__init__(name=name)
 
     def initialise(self):
@@ -100,28 +172,43 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         self._t_wait = None
         self._t_start = time.time()
         now_time = datetime.datetime.now().time()
-        for schedule_element in self._schedule:
+        matched_idx = None
+        for idx, schedule_element in enumerate(self._schedule):
             start = schedule_element['start_plus_variance_time']
             stop = schedule_element['stop_plus_variance_time']
-            variance = schedule_element['variance_time']
             if (start < stop and start < now_time < stop) or \
                (start > stop and (now_time > start or now_time < stop)):
-                if now_time < stop:
-                    self._t_wait = datetime_time_to_sec(stop) - \
-                                   datetime_time_to_sec(now_time)
-                else:
-                    self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
-                                   datetime_time_to_sec(now_time) + \
-                                   datetime_time_to_sec(stop)
-                self._t_start = time.time()
-                logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
-                schedule_element['start_plus_variance_time'] = \
-                    add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
-                schedule_element['stop_plus_variance_time'] = \
-                    add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
-                logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
-                logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
+                matched_idx = idx
                 break
+
+        # Re-arm once we've left all windows.
+        if matched_idx is None:
+            self._last_schedule_idx = None
+            return
+
+        # Don't re-pause for the same window we already handled.
+        if matched_idx == self._last_schedule_idx:
+            return
+
+        self._last_schedule_idx = matched_idx
+        schedule_element = self._schedule[matched_idx]
+        stop = schedule_element['stop_plus_variance_time']
+        variance = schedule_element['variance_time']
+        if now_time < stop:
+            self._t_wait = datetime_time_to_sec(stop) - \
+                           datetime_time_to_sec(now_time)
+        else:
+            self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
+                           datetime_time_to_sec(now_time) + \
+                           datetime_time_to_sec(stop)
+        self._t_start = time.time()
+        logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
+        schedule_element['start_plus_variance_time'] = \
+            add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
+        schedule_element['stop_plus_variance_time'] = \
+            add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
+        logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
+        logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
 
     def update(self):
         if self._t_wait is None:

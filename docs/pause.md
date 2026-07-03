@@ -51,7 +51,7 @@ load_schedule_file(file_path)
 |---|---|---|
 | `file_path` | `str` | Path to the YAML schedule file |
 
-**Returns:** A preprocessed schedule list suitable for passing to `CheckPauseSchedule` and `PauseSchedule`.
+**Returns:** A preprocessed schedule list suitable for passing to `PauseSchedule`.
 
 **YAML format**
 
@@ -80,39 +80,9 @@ schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
 
 ---
 
-### `CheckPauseSchedule`
-
-A leaf behavior that returns `SUCCESS` when the current wall-clock time falls inside any window in the schedule, and `FAILURE` otherwise.
-
-```python
-CheckPauseSchedule(name, schedule)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `name` | `str` | Name of this behavior node |
-| `schedule` | `list` | Preprocessed schedule from `load_schedule_file` |
-
-**Returns:** `SUCCESS` if the current time is within a pause window; `FAILURE` otherwise.
-
-**Example**
-
-```python
-from py_branches.pause import load_schedule_file, CheckPauseSchedule
-
-schedule = load_schedule_file("configs/schedules/my_schedule.yaml")
-check = CheckPauseSchedule(name="IsScheduledPause", schedule=schedule)
-```
-
-**Notes:**
-- Once a window is matched, the same window will not re-trigger until after it ends, preventing repeated matches within a single window.
-- Typical use: as the condition in a behavior tree branch that switches to pause mode during scheduled downtime.
-
----
-
 ### `PauseSchedule`
 
-A leaf behavior that pauses until the end of the currently active schedule window (with variance applied).
+A leaf behavior that pauses until the end of the currently active schedule window (with variance applied). If the current time is not inside any window, it returns `SUCCESS` immediately.
 
 ```python
 PauseSchedule(name, schedule)
@@ -123,41 +93,22 @@ PauseSchedule(name, schedule)
 | `name` | `str` | Name of this behavior node |
 | `schedule` | `list` | Preprocessed schedule from `load_schedule_file` |
 
-**Returns:** `RUNNING` until the current schedule window's stop time is reached, then `SUCCESS`.
+**Returns:** `SUCCESS` immediately if outside all windows; otherwise `RUNNING` until the active window's stop time is reached, then `SUCCESS`.
 
 **Example**
 
 ```python
+import py_trees
 from py_branches.pause import load_schedule_file, PauseSchedule
 
-schedule = load_schedule_file("configs/schedules/my_schedule.yaml")
+schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
 pause = PauseSchedule(name="ScheduledPause", schedule=schedule)
+
+root = py_trees.composites.Sequence(name="Root", memory=True)
+root.add_children([pause, main_behavior])
 ```
 
 **Notes:**
-- On `initialise`, calculates how many seconds remain until the end of the current window.
+- On `initialise`, checks whether the current time is inside a window and, if so, calculates how many seconds remain until that window's end.
+- Once a window has been handled, the same window will not re-pause until after it ends, preventing repeated pauses within a single window.
 - A new random variance offset is applied each time the behavior is re-entered.
-
----
-
-## Schedule-Based Pause Pattern
-
-A common pattern is to check the schedule and, if in a pause window, wait until the window ends:
-
-```python
-import py_trees
-from py_branches.pause import load_schedule_file, CheckPauseSchedule, PauseSchedule
-
-schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
-
-check = CheckPauseSchedule(name="CheckSchedule", schedule=schedule)
-pause = PauseSchedule(name="WaitForWindowEnd", schedule=schedule)
-
-# Sequence: if currently in a pause window, then wait until it ends
-pause_branch = py_trees.composites.Sequence(name="PauseBranch", memory=True)
-pause_branch.add_children([check, pause])
-
-# Selector: try the pause branch; if not in a window, proceed normally
-root = py_trees.composites.Selector(name="Root", memory=False)
-root.add_children([pause_branch, main_behavior])
-```
