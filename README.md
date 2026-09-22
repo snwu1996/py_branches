@@ -1,5 +1,9 @@
 # py_branches
 
+[![CI](https://github.com/snwu1996/py_branches/actions/workflows/ci.yml/badge.svg)](https://github.com/snwu1996/py_branches/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/snwu1996/py_branches/branch/main/graph/badge.svg)](https://codecov.io/gh/snwu1996/py_branches)
+[![PyPI](https://img.shields.io/pypi/v/py_branches)](https://pypi.org/project/py_branches/)
+
 `py_branches` provides higher-level functionality designed to sit on top of the [py_trees](https://py-trees.readthedocs.io/) library. It extends py_trees with reusable behaviors and decorators for common patterns such as alternating execution, probabilistic selection, blackboard-driven conditionals, and time-based pausing.
 
 ## Installation
