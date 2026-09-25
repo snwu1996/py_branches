@@ -72,7 +72,7 @@ class PausePDF(py_trees.behaviour.Behaviour):
     def initialise(self):
         t_wait = self._min_t - 1.0
         while not (self._min_t <= t_wait <= self._max_t):
-            t_wait = float(self._model.sample(1)[0][0])
+            t_wait = float(self._model.sample(1)[0][0]) # pyright: ignore
         self._pause_t = t_wait
         self._start_t = time.time()
         self.logger.debug(f'{self.name} sampled pause {self._pause_t:.3f} sec')
@@ -139,7 +139,7 @@ def load_schedule_file(schedule_filepath: str):
         schedule_raw = yaml.safe_load(schedule_file)
 
     schedule = []
-    for schedule_element_raw in schedule_raw:
+    for schedule_element_raw in schedule_raw: # pyright: ignore
         start_pause_time = datetime.datetime.strptime(schedule_element_raw['start_pause_time'], '%H:%M:%S').time()
         stop_pause_time = datetime.datetime.strptime(schedule_element_raw['stop_pause_time'], '%H:%M:%S').time()
         variance_time = datetime.datetime.strptime(schedule_element_raw['variance'], '%H:%M:%S').time()
