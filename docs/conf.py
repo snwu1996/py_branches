@@ -4,6 +4,15 @@
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _package_version
+import os
+import sys
+
+# tree_examples.py (the diagram factories) and _ext/render_trees.py (the
+# extension that calls them) sit beside this file rather than in the installed
+# package, so neither is importable without help.
+_HERE = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, _HERE)
+sys.path.insert(0, os.path.join(_HERE, '_ext'))
 
 # -- Project information -----------------------------------------------------
 
@@ -35,6 +44,7 @@ extensions = [
     'sphinx.ext.graphviz',
     'sphinx_autodoc_typehints',
     'myst_parser',
+    'render_trees',
 ]
 
 templates_path = ['_templates']

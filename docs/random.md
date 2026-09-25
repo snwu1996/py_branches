@@ -29,6 +29,17 @@ probabilities that do not match what you passed in, this is why — and the last
 child is often undecorated entirely, because by the time the selector reaches
 it, it must run.
 
+The rewriting is visible in the tree itself:
+
+```{figure} _static/trees/weighted_selection.svg
+:alt: A Selector with two RandomRun decorators and one undecorated behavior
+:target: _static/trees/weighted_selection.svg
+
+Weights of 20%, 30% and 50%. `Idle` and `Patrol` are wrapped in `RandomRun`
+decorators carrying conditional probabilities, while `Investigate` is added
+undecorated — once the first two are skipped, it must run.
+```
+
 One consequence: order matters. The same weights in a different order produce
 the same selection frequencies, but the tree they build is not identical.
 

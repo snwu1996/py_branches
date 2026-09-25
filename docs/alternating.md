@@ -34,6 +34,27 @@ entirely on the composite above it:
 - Under a **Sequence**, set it `True`. FAILURE would abort the whole sequence;
   SUCCESS makes the skip invisible and lets the following children run.
 
+## The subtree it builds
+
+`run_alternating` is a factory, not a decorator, so what lands in your tree is a
+small subtree rather than a single node. Three behaviors cycling for 3, 2 and 4
+ticks produce this:
+
+```{figure} _static/trees/alternating_cycle.svg
+:alt: A Selector containing a bookkeeping behavior followed by three ActivateBehavior decorators
+:target: _static/trees/alternating_cycle.svg
+
+`Cycle_helper` advances the rotation and always returns FAILURE, so the Selector
+falls through to the `activate_*` wrappers — exactly one of which is enabled on
+any given tick.
+```
+
+Two things follow from that shape. The Selector is built without memory, so it
+re-evaluates from the left on every tick, which is what lets the helper run
+first each time. And the behaviors you passed in are not the Selector's children
+directly — each is wrapped, so a handle you kept to one of them is still the
+inner behavior, not the node in the tree.
+
 ## API
 
 ```{eval-rst}

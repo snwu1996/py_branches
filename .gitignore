@@ -8,3 +8,4 @@ coverage.xml
 htmlcov
 **/.claude/settings.local.json
 docs/_build
+docs/_static/trees

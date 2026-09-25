@@ -53,6 +53,25 @@ therefore finishes its work even if the variable changes underneath it. That is
 usually what you want; if you need a gate that interrupts mid-execution, you
 need a different construct.
 
+## A worked example
+
+A counter incremented on every tick, gating a behavior that should only run once
+the count passes ten:
+
+```{figure} _static/trees/blackboard_gate.svg
+:alt: A Sequence containing an increment behavior and a gate decorator wrapping a leaf
+:target: _static/trees/blackboard_gate.svg
+
+`CountTicks` writes `tick_count` on every tick; `OnceAboveTen` reads it and
+decides whether to tick `ReportProgress` at all.
+```
+
+The keys each node touches are not visible in the graph. py_trees can annotate a
+diagram with blackboard variables, but it reads them from clients attached via
+`attach_blackboard_client`, and these classes construct their clients directly —
+so the tree shows the structure while the data flow stays implicit. Keep the key
+names in your node names, as above, and the diagram stays readable.
+
 ## API
 
 ```{eval-rst}

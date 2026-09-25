@@ -21,6 +21,14 @@ each attempt is bounded, and an attempt that hangs is converted into a failure
 that `Retry` can then act on. The order matters: `Retry(Timeout(child))` bounds
 each attempt, while `Timeout(Retry(child))` bounds the entire retry cycle.
 
+```{figure} _static/trees/bounded_retry.svg
+:alt: A Retry decorator wrapping a Timeout decorator wrapping a single behavior
+:target: _static/trees/bounded_retry.svg
+
+`Retry(Timeout(child))` — the timeout is inside, so it bounds each attempt
+rather than the whole cycle.
+```
+
 ## API
 
 ```{eval-rst}
