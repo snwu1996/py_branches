@@ -16,6 +16,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 packages = [{ include = "py_branches" }]
+# Belt and braces: poetry already skips VCS-ignored files, but an agent
+# settings directory inside the package must never reach a wheel even if it
+# is untracked or someone commits a shared settings.json.
+exclude = ["py_branches/.claude", "py_branches/**/.claude"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
