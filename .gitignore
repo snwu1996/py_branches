@@ -7,3 +7,4 @@ py_branches.egg-info
 coverage.xml
 htmlcov
 **/.claude/settings.local.json
+docs/_build

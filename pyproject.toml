@@ -34,6 +34,12 @@ pytest = "*"
 pytest-cov = "*"
 pyright = "^1.1.414"
 
+[tool.poetry.group.docs.dependencies]
+sphinx = "^8.1"
+sphinx-rtd-theme = "^3.0"
+myst-parser = "^4.0"
+sphinx-autodoc-typehints = "^2.5"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
