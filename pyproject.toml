@@ -1,25 +1,50 @@
 [tool.poetry]
 name = "py_branches"
-version = "1.5.0"
-description = "Useful behaviors built on top of the py_trees library."
+version = "1.5.1"
+description = "Reusable behavior-tree behaviors and decorators for Python, built on py_trees."
 authors = ["Shunong Wu <shunongwu@gmail.com>"]
 license = "BSD"
 readme = "README.md"
 homepage = "https://github.com/snwu1996/py_branches"
 repository = "https://github.com/snwu1996/py_branches"
+documentation = "https://py-branches.readthedocs.io/en/latest/"
+# PyPI indexes these, and they are the only keyword surface the package page
+# has besides the README.
+keywords = [
+    "py-trees",
+    "behavior-tree",
+    "behaviour-tree",
+    "behavior-trees",
+    "decorators",
+    "blackboard",
+    "robotics",
+    "ai",
+]
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
+    # PyPI's left-hand nav filters on these, so each supported minor gets a row.
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 packages = [{ include = "py_branches" }]
 # Belt and braces: poetry already skips VCS-ignored files, but an agent
 # settings directory inside the package must never reach a wheel even if it
 # is untracked or someone commits a shared settings.json.
 exclude = ["py_branches/.claude", "py_branches/**/.claude"]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/snwu1996/py_branches/issues"
+"Changelog" = "https://github.com/snwu1996/py_branches/releases"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
@@ -39,6 +64,7 @@ sphinx = "^8.1"
 sphinx-rtd-theme = "^3.0"
 myst-parser = "^4.0"
 sphinx-autodoc-typehints = "^2.5"
+sphinx-sitemap = "^2.6"
 
 [build-system]
 requires = ["poetry-core"]
