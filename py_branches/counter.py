@@ -38,13 +38,13 @@ class Counter(py_trees.decorators.Decorator):
         ValueError: If ``num_runs`` is less than 1.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
-            child = InitializationBehavior(name="Init")
+            child = py_trees.behaviours.Success(name="Init")
             # Run Init exactly once; after it completes, always return SUCCESS.
             counted = Counter(child, name="RunOnce", num_runs=1)
 
-            child = CalibrateStep(name="Calibrate")
+            child = py_trees.behaviours.Success(name="Calibrate")
             # Run calibration exactly 3 times, then always return SUCCESS.
             counted = Counter(child, name="Calibrate3x", num_runs=3)
     '''

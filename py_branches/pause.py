@@ -59,7 +59,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
         Status: RUNNING until the sampled duration elapses, then SUCCESS.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             # Pause for between 2 and 5 seconds.
             pause = PauseUniform(name="ShortPause", low=2.0, high=5.0)
@@ -194,7 +194,7 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
         Status: RUNNING until the key is pressed, then SUCCESS.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             # Hold the tree until the operator presses space.
             gate = PauseUntilKey(name="WaitForSpace", key="space")

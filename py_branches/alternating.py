@@ -45,7 +45,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
             deactivated. Default False.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Child")
             gate = ActivateBehavior(child, name="Gate", activate=True,
@@ -145,7 +145,7 @@ def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], co
 
             A, A, A, B, B, C, C, C, C, A, A, A, B, B, ...
 
-        .. code-block:: python
+        .. testcode::
 
             a = py_trees.behaviours.Success(name="A")
             b = py_trees.behaviours.Success(name="B")
@@ -207,7 +207,7 @@ class RunEveryRange(py_trees.decorators.Decorator):
             6 and (2,4) then the child will run on the 2nd, 3rd, and 4th cycle.
                 S, E, E, E, S, S, S, E, E, E, S, S, S, E, E, ...
 
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Child")
 
@@ -293,7 +293,7 @@ class RunEveryX(py_trees.decorators.Decorator):
                     1: E
                     4: S, S, S, E
 
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Child")
 

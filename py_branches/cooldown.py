@@ -37,7 +37,7 @@ class Cooldown(py_trees.decorators.Decorator):
         ValueError: If ``duration`` is not positive.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Expensive")
             # Run child freely, but enforce a 5-second gap between executions.

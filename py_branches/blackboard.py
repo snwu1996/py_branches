@@ -22,7 +22,7 @@ Every class registers the key it touches on construction, so no manual
 registration is needed for the keys used here. The variable itself must still
 exist before a reader or an incrementer runs:
 
-.. code-block:: python
+.. testcode::
 
     import py_trees
 
@@ -37,13 +37,13 @@ as unmet.
 Example:
     Increment a counter every tick and run a special action once it reaches 5.
 
-    .. code-block:: python
+    .. testcode::
 
         import py_trees
         from py_branches.blackboard import IncrementBlackboardVariable
         from py_branches.blackboard import RunIfBlackboardVariableEquals
 
-        client = py_trees.blackboard.Client(name="setup")
+        client = py_trees.blackboard.Client(name="example_setup")
         client.register_key("tick_count", access=py_trees.common.Access.WRITE)
         client.tick_count = 0
 
@@ -115,7 +115,7 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
         logged.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             counter = IncrementBlackboardVariable(
                 name="IncrementCounter", variable_name="counter", increment_by=1
@@ -166,7 +166,7 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         increment_by (float): Amount to add. Default 1.0.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Child")
 
@@ -211,7 +211,7 @@ class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         set_to (Any): Value to write to the blackboard key.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Failure(name="Child")
 
@@ -264,7 +264,7 @@ class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
             transparent to a parent Sequence.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="SpecialAction")
 
@@ -328,9 +328,9 @@ class RunIfBlackboardVariableLessThan(py_trees.decorators.Decorator):
             condition is not met. Default True.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
-            child = RetryDownload(name="Download")
+            child = py_trees.behaviours.Running(name="Download")
 
             # Keep retrying only while the attempt count is under 5.
             gated = RunIfBlackboardVariableLessThan(
@@ -390,7 +390,7 @@ class RunIfBlackboardVariableGreaterThan(py_trees.decorators.Decorator):
             condition is not met. Default True.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Celebrate")
 

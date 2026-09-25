@@ -3,6 +3,7 @@
 [![CI](https://github.com/snwu1996/py_branches/actions/workflows/ci.yml/badge.svg)](https://github.com/snwu1996/py_branches/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/snwu1996/py_branches/branch/main/graph/badge.svg)](https://codecov.io/gh/snwu1996/py_branches)
 [![PyPI](https://img.shields.io/pypi/v/py_branches)](https://pypi.org/project/py_branches/)
+[![Docs](https://readthedocs.org/projects/py-branches/badge/?version=latest)](https://py-branches.readthedocs.io/en/latest/)
 
 `py_branches` provides higher-level functionality designed to sit on top of the [py_trees](https://py-trees.readthedocs.io/) library. It extends py_trees with reusable behaviors and decorators for common patterns such as alternating execution, probabilistic selection, blackboard-driven conditionals, and time-based pausing.
 
@@ -136,12 +137,18 @@ pytest tests/
 
 ## Documentation
 
-Detailed documentation for each module is in the [`docs/`](docs/) folder:
+Full documentation, including an API reference generated from the source
+and rendered behavior-tree diagrams, is at
+[py-branches.readthedocs.io](https://py-branches.readthedocs.io/en/latest/).
 
-- [alternating.md](docs/alternating.md) — Alternating and periodic execution
-- [blackboard.md](docs/blackboard.md) — Blackboard-driven behaviors
-- [pause.md](docs/pause.md) — Time-based pausing and schedules
-- [random.md](docs/random.md) — Probabilistic execution
+To build it locally:
+
+```bash
+poetry install --with docs
+poetry run sphinx-build -b html docs docs/_build/html
+```
+
+Rendering the diagrams needs the `dot` binary (`apt install graphviz`).
 
 ## License
 

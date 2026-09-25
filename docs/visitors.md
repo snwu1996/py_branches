@@ -6,10 +6,11 @@ without changing the tree's shape. Neither visitor here affects control flow.
 
 ## Attaching them
 
-```python
+```{testcode}
 import py_trees
 from py_branches.visitors import StatusTransitionVisitor, TimerVisitor
 
+root = py_trees.composites.Sequence(name="Root", memory=True)
 tree = py_trees.trees.BehaviourTree(root)
 tree.visitors.append(StatusTransitionVisitor())
 tree.visitors.append(TimerVisitor())

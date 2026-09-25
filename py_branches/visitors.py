@@ -8,8 +8,9 @@ change the tree's shape:
   changes, keeping the output readable on a tree that ticks quickly.
 * :class:`TimerVisitor` — log how long each behavior spent RUNNING.
 
-.. code-block:: python
+.. testcode::
 
+    root = py_trees.composites.Sequence(name="Root", memory=True)
     tree = py_trees.trees.BehaviourTree(root)
     tree.visitors.append(StatusTransitionVisitor())
     tree.visitors.append(TimerVisitor())

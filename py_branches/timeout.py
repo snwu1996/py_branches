@@ -31,9 +31,9 @@ class Timeout(py_trees.decorators.Decorator):
         ValueError: If ``duration`` is not positive.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
-            child = LongRunningBehavior(name="Slow")
+            child = py_trees.behaviours.Running(name="Slow")
             # Fail if child does not complete within 5 seconds.
             guarded = Timeout(child, name="Timeout", duration=5.0)
     '''

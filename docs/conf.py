@@ -120,3 +120,43 @@ html_theme_options = {
 
 # SVG stays sharp at any zoom and keeps text selectable; the default is PNG.
 graphviz_output_format = 'svg'
+
+# -- Doctest ------------------------------------------------------------------
+
+# Every ``testcode`` block in a docstring or a page runs with these names
+# already bound, so the examples read the way a user would write them rather
+# than carrying a preamble of imports. Blocks that need to show an import for
+# the reader's benefit still may - importing twice is harmless.
+doctest_global_setup = """
+import py_trees
+
+from py_branches.alternating import ActivateBehavior
+from py_branches.alternating import RunEveryRange
+from py_branches.alternating import RunEveryX
+from py_branches.alternating import run_alternating
+from py_branches.blackboard import IncrementBlackboardVariable
+from py_branches.blackboard import IncrementBlackboardVariableIfCondition
+from py_branches.blackboard import RunIfBlackboardVariableEquals
+from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
+from py_branches.blackboard import RunIfBlackboardVariableLessThan
+from py_branches.blackboard import SetBlackboardVariableIfCondition
+from py_branches.cooldown import Cooldown
+from py_branches.counter import Counter
+from py_branches.latch import Latch
+from py_branches.pause import PauseSchedule
+from py_branches.pause import PauseUniform
+from py_branches.pause import PauseUntilKey
+from py_branches.pause import load_schedule_file
+from py_branches.random import RandomDelay
+from py_branches.random import RandomRun
+from py_branches.random import random_selector
+from py_branches.retry import Retry
+from py_branches.timeout import Timeout
+from py_branches.visitors import StatusTransitionVisitor
+from py_branches.visitors import TimerVisitor
+"""
+
+# Three examples in py_branches.pause stay plain code-blocks rather than
+# testcode: PausePDF needs a sample data file, and load_schedule_file and
+# PauseSchedule need a schedule on disk at a path relative to the caller. They
+# are shown, not executed.

@@ -88,6 +88,48 @@ jobs:
         # the output is mostly unresolved-import noise.
         run: poetry run pyright
 
+  docs:
+    # Warnings are errors here: a broken cross-reference, a docstring that does
+    # not parse, or a diagram that failed to render must not reach the
+    # published site unnoticed.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # Matches the interpreter Read the Docs builds with, so a failure
+          # here is a failure there.
+          python-version: "3.13"
+
+      - name: Install graphviz
+        # render_trees shells out to dot to draw the behavior-tree diagrams.
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        # Mirrors the Read the Docs install: runtime deps are needed because
+        # autodoc imports every module, dev tools are not.
+        run: poetry install --only main,docs
+
+      - name: Build documentation
+        run: >-
+          poetry run sphinx-build -b html -W --keep-going
+          docs docs/_build/html
+
+      - name: Run documented examples
+        # Executes every testcode block, so an example whose signature no
+        # longer matches the code it documents fails the build.
+        run: poetry run sphinx-build -b doctest docs docs/_build/doctest
+
   version:
     # Release PRs must bump the version; label a PR 'no-version-bump' to skip.
     if: >-

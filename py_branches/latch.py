@@ -29,9 +29,9 @@ class Latch(py_trees.decorators.Decorator):
         name (str): Name of this decorator.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
-            child = ExpensiveSetupBehavior(name="Setup")
+            child = py_trees.behaviours.Success(name="Setup")
             # Run setup once; once it succeeds, always return SUCCESS without
             # re-running it.
             latched = Latch(child, name="Latch")

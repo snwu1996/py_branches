@@ -21,10 +21,10 @@ Every class here registers the key it touches, so you never need to register
 one yourself. What you do need is for the value to exist before a reader or an
 incrementer runs, because neither creates it:
 
-```python
+```{testcode}
 import py_trees
 
-client = py_trees.blackboard.Client(name="setup")
+client = py_trees.blackboard.Client(name="page_setup")
 client.register_key("tick_count", access=py_trees.common.Access.WRITE)
 client.tick_count = 0
 ```

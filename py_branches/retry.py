@@ -33,7 +33,7 @@ class Retry(py_trees.decorators.Decorator):
             negative.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Failure(name="Flaky")
             # Try up to 3 times; fails permanently after 3 failures.

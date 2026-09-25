@@ -11,7 +11,7 @@ These compose with the rest of the library — wrapping a behavior in
 :func:`py_branches.alternating.run_alternating`, for instance, makes a cycling
 pattern that sometimes skips a step:
 
-.. code-block:: python
+.. testcode::
 
     from py_branches.alternating import run_alternating
     from py_branches.random import RandomRun
@@ -56,7 +56,7 @@ class RandomRun(py_trees.decorators.Decorator):
         ValueError: If ``probability`` falls outside ``[0.0, 1.0]``.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Child")
 
@@ -121,7 +121,7 @@ class RandomDelay(py_trees.decorators.Decorator):
         ValueError: If ``low`` is negative, or greater than ``high``.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             child = py_trees.behaviours.Success(name="Action")
             # Pause 0.5-2.0 seconds before running the child each time.
@@ -198,7 +198,7 @@ def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabi
             differ in length.
 
     Example:
-        .. code-block:: python
+        .. testcode::
 
             a = py_trees.behaviours.Success(name="A")
             b = py_trees.behaviours.Success(name="B")
