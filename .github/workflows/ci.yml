@@ -5,6 +5,8 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main]
+    # labeled/unlabeled so adding 'no-version-bump' re-runs the version check
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
   build-and-test:
@@ -38,4 +40,79 @@ jobs:
         run: poetry install --with dev
 
       - name: Run tests
-        run: poetry run pytest tests/ -v
+        # --cov-fail-under is added once the first CI run reports the baseline.
+        run: >-
+          poetry run pytest tests/ -v
+          --cov=py_branches
+          --cov-report=xml
+          --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        # One leg only; parallel uploads for the same commit make the merged
+        # total noisy.
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # A silent upload failure would freeze the badge at a stale number.
+          fail_ci_if_error: true
+
+  pyright:
+    # Advisory only: pyright findings are reported but never fail the build.
+    # Drop continue-on-error once the existing errors are cleared to make it
+    # a real gate.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run pyright
+        # Runs inside the venv so third-party imports resolve; without that
+        # the output is mostly unresolved-import noise.
+        run: poetry run pyright
+
+  version:
+    # Release PRs must bump the version; label a PR 'no-version-bump' to skip.
+    if: >-
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'no-version-bump')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need base branch history to read its pyproject.toml.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # 3.11+ for stdlib tomllib; the check needs no third-party packages.
+          python-version: "3.12"
+
+      - name: Extract base branch pyproject.toml
+        run: |
+          git show "origin/${{ github.base_ref }}:pyproject.toml" > "$RUNNER_TEMP/base-pyproject.toml"
+
+      - name: Check version was bumped
+        run: |
+          python scripts/check_version_bump.py \
+            --base "$RUNNER_TEMP/base-pyproject.toml" \
+            --head pyproject.toml

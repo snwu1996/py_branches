@@ -77,7 +77,7 @@ class RandomDelay(py_trees.decorators.Decorator):
         self._low = low
         self._high = high
         self._delay = 0.0
-        self._start_time = None
+        self._start_time: float | None = None
         self._waiting = False
 
     def tick(self):
@@ -87,7 +87,7 @@ class RandomDelay(py_trees.decorators.Decorator):
             self._start_time = time.time()
             self._waiting = True
 
-        if self._waiting:
+        if self._waiting and self._start_time is not None:
             if time.time() - self._start_time < self._delay:
                 self.status = py_trees.common.Status.RUNNING
                 yield self

@@ -29,7 +29,7 @@ class Timeout(py_trees.decorators.Decorator):
             raise ValueError(f'duration({duration}) must be positive.')
         super(Timeout, self).__init__(name=name, child=child)
         self._duration = duration
-        self._start_time = None
+        self._start_time: float | None = None
 
     def initialise(self) -> None:
         self._start_time = time.time()
@@ -37,6 +37,11 @@ class Timeout(py_trees.decorators.Decorator):
     def update(self) -> py_trees.common.Status:
         if self.decorated.status != py_trees.common.Status.RUNNING:
             return self.decorated.status
+
+        if self._start_time is None:
+            # update() before initialise(): the clock has not started, so
+            # nothing can have timed out yet.
+            return py_trees.common.Status.RUNNING
 
         elapsed = time.time() - self._start_time
         if elapsed >= self._duration:

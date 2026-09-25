@@ -3,3 +3,7 @@
 build
 dist
 py_branches.egg-info
+.coverage
+coverage.xml
+htmlcov
+**/.claude/settings.local.json

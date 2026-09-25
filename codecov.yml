@@ -1,0 +1,11 @@
+# pytest's --cov-fail-under is the gate; Codecov only reports. Two gates that
+# can disagree is worse than one.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        # pause/cooldown/timeout/random_delay are time-based, so coverage
+        # drifts slightly between runs.
+        threshold: 1%
+    patch: off

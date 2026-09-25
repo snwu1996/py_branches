@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py_branches"
-version = "1.3.0"
+version = "1.4.0"
 description = "Useful behaviors built on top of the py_trees library."
 authors = ["Shunong Wu <shunongwu@gmail.com>"]
 license = "BSD"
@@ -16,6 +16,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 packages = [{ include = "py_branches" }]
+# Belt and braces: poetry already skips VCS-ignored files, but an agent
+# settings directory inside the package must never reach a wheel even if it
+# is untracked or someone commits a shared settings.json.
+exclude = ["py_branches/.claude", "py_branches/**/.claude"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
@@ -27,7 +31,28 @@ scikit-learn = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
+pytest-cov = "*"
+pyright = "^1.1.414"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+include = ["py_branches", "tests"]
+typeCheckingMode = "basic"
+# No venvPath/venv: pyright resolves imports from whichever interpreter is on
+# PATH, so `poetry run pyright` works against the active venv both locally and
+# in CI, wherever poetry puts it.
+
+[tool.coverage.run]
+source = ["py_branches"]
+# These behaviors are mostly if-ladders over tick status, so statement-only
+# coverage would overstate how well they are exercised.
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

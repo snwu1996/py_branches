@@ -39,10 +39,10 @@ class Cooldown(py_trees.decorators.Decorator):
         self._duration = duration
         self._success_if_cooling = success_if_cooling
         self._cooling = False
-        self._cool_start = None
+        self._cool_start: float | None = None
 
     def tick(self):
-        if self._cooling:
+        if self._cooling and self._cool_start is not None:
             elapsed = time.time() - self._cool_start
             if elapsed < self._duration:
                 if self._success_if_cooling:
