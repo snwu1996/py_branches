@@ -1,117 +1,52 @@
 # pause
 
-The `pause` module provides behaviors that pause execution for a specified duration. Pauses can be uniform-random (between a low and high bound) or schedule-driven (defined in a YAML file with time windows and variance).
+Four leaf behaviors that hold a tree still, differing only in where the wait
+comes from. All of them return RUNNING while waiting and SUCCESS once done, so
+the rest of the tree keeps ticking — none of them block.
 
-All pause behaviors return `RUNNING` while the pause is active and `SUCCESS` once the wait time has elapsed.
+## Choosing between them
 
-## Classes and Functions
-
----
-
-### `PauseUniform`
-
-A leaf behavior that pauses for a random duration drawn uniformly from `[low, high)`.
-
-```python
-PauseUniform(name, low, high)
-```
-
-| Parameter | Type | Description |
+| | Waits for | Use for |
 |---|---|---|
-| `name` | `str` | Name of this behavior node |
-| `low` | `float` | Minimum pause duration in seconds |
-| `high` | `float` | Maximum pause duration in seconds |
+| `PauseUniform` | A duration drawn between two bounds | General jitter, think time |
+| `PausePDF` | A duration drawn from recorded samples | Reproducing observed timing distributions |
+| `PauseUntilKey` | A key press | Operator-gated steps, debugging |
+| `PauseSchedule` | A wall-clock window from a YAML file | Idling overnight, or over lunch |
 
-**Returns:** `RUNNING` until the elapsed time reaches the sampled pause duration, then `SUCCESS`.
+## Schedule files
 
-**Example**
-
-```python
-from py_branches.pause import PauseUniform
-
-# Pause for between 2 and 5 seconds
-pause = PauseUniform(name="ShortPause", low=2.0, high=5.0)
-```
-
-**Notes:**
-- The random duration is sampled once on `initialise` using `numpy.random.uniform`.
-- A new duration is sampled on each subsequent activation (i.e. after the behavior terminates and is re-entered).
-
----
-
-### `load_schedule_file`
-
-Loads and preprocesses a YAML pause schedule file.
-
-```python
-load_schedule_file(file_path)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `file_path` | `str` | Path to the YAML schedule file |
-
-**Returns:** A preprocessed schedule list suitable for passing to `PauseSchedule`, or `None` if YAML reads the file as empty (blank or comments only), in which case the failure is logged. Raises `FileNotFoundError` if the path is not a file.
-
-**YAML format**
-
-Each entry defines a pause window with an optional random variance applied to the stop time:
+`PauseSchedule` does not read YAML itself — pass it the output of
+`load_schedule_file`, which parses the times and pre-computes the random
+offsets. A schedule is a list of windows:
 
 ```yaml
 - start_pause_time: "22:30:00"
-  stop_pause_time: "06:30:00"
-  variance: "0:30:00"
-- start_pause_time: "12:30:00"
-  stop_pause_time: "16:30:00"
+  stop_pause_time: "6:30:00"
   variance: "0:30:00"
 ```
 
-- `start_pause_time` / `stop_pause_time`: Wall-clock times in `HH:MM:SS` format.
-- `variance`: A `±` random offset applied to the stop time. If `"0:30:00"`, the actual stop time is sampled from `[stop - 30min, stop + 30min]`.
-- Windows that cross midnight (e.g. `22:30` → `06:30`) are handled automatically.
+Two things about `variance` are easy to get wrong. It is applied to **both** the
+start and the stop time, independently; and it only ever shifts a time
+**later** — the offset is drawn from `[0, variance]`, never negative. So the
+window above starts somewhere in 22:30–23:00 and ends somewhere in 06:30–07:00.
+Fresh offsets are drawn each time a window is handled, so the boundaries move
+from day to day.
 
-**Example**
+Windows that cross midnight, like the one above, are matched correctly.
 
-```python
-from py_branches.pause import load_schedule_file
+`load_schedule_file` returns `None` — it does not raise — when the file parses
+as empty, so check for it before constructing `PauseSchedule`.
 
-schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
+## Pausing at most once per window
+
+`PauseSchedule` remembers the window it last handled and will not pause for it
+again, even while the clock is still inside it. It re-arms once the current time
+has left every window. Without this, a tree that ticks after the pause finishes
+would immediately pause again for the rest of the window.
+
+## API
+
+```{eval-rst}
+.. automodule:: py_branches.pause
+   :members:
 ```
-
----
-
-### `PauseSchedule`
-
-A leaf behavior that pauses until the end of the currently active schedule window (with variance applied). If the current time is not inside any window, it returns `SUCCESS` immediately.
-
-```python
-PauseSchedule(name, schedule)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `name` | `str` | Name of this behavior node |
-| `schedule` | `list` | Preprocessed schedule from `load_schedule_file` |
-
-**Returns:** `SUCCESS` immediately if outside all windows; otherwise `RUNNING` until the active window's stop time is reached, then `SUCCESS`.
-
-**Example**
-
-```python
-import py_trees
-from py_branches.pause import load_schedule_file, PauseSchedule
-
-schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
-if schedule is None:
-    raise SystemExit("schedule file is empty")
-
-pause = PauseSchedule(name="ScheduledPause", schedule=schedule)
-
-root = py_trees.composites.Sequence(name="Root", memory=True)
-root.add_children([pause, main_behavior])
-```
-
-**Notes:**
-- On `initialise`, checks whether the current time is inside a window and, if so, calculates how many seconds remain until that window's end.
-- Once a window has been handled, the same window will not re-pause until after it ends, preventing repeated pauses within a single window.
-- A new random variance offset is applied each time the behavior is re-entered.

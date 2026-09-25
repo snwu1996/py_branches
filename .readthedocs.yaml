@@ -1,0 +1,44 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set the OS, Python version, and other tools you might need
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.13"
+  apt_packages:
+    # Needed by sphinx.ext.graphviz to render behavior-tree diagrams. Without
+    # it the build fails on Read the Docs only, since local machines usually
+    # have dot already.
+    - graphviz
+  jobs:
+    post_create_environment:
+      - pip install poetry==1.8.2
+    post_install:
+      # Install into the environment Read the Docs created rather than letting
+      # poetry build its own venv, which the Sphinx build would never see.
+      #
+      # This replaces the commented-out python.install block below: the deps
+      # are declared once in pyproject.toml's docs group, so there is no
+      # docs/requirements.txt to drift out of sync.
+      #
+      # --only main,docs skips pytest/pyright. Runtime deps are required
+      # because autodoc imports every module to read its docstrings; the dev
+      # tools are not.
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --only main,docs
+
+# Build documentation in the "docs/" directory with Sphinx
+sphinx:
+   configuration: docs/conf.py
+   # Flip to true once the first clean build lands, to catch broken
+   # cross-references. Phase 5 adds the same gate to CI via `make strict`.
+   fail_on_warning: false
+
+# Requirements are installed by the post_install job above rather than here,
+# so that pyproject.toml stays the single source of truth.
+# python:
+#    install:
+#    - requirements: docs/requirements.txt

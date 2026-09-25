@@ -1,35 +1,52 @@
 #!/usr/bin/env python3
+"""Cap the total number of times a child behavior runs.
+
+A single decorator, :class:`Counter`, for one-time or fixed-count sequences
+such as initialization and calibration.
+"""
 import py_trees
 
 
 class Counter(py_trees.decorators.Decorator):
     '''
-    Runs a child behavior exactly num_runs times (total completions), then
-    permanently returns completion_status without ever running the child again.
+    Runs a child behavior exactly ``num_runs`` times (total completions), then
+    permanently returns ``completion_status`` without ever running the child
+    again.
 
     A "completion" is any tick where the child returns SUCCESS or FAILURE.
     RUNNING ticks do not count — the counter waits for the child to finish each
-    run before counting it.
+    run before counting it.  Between runs the child is reset to INVALID so it
+    starts cleanly, and this decorator reports RUNNING.
+
+    Note that FAILURE counts as a completion: ``Counter`` limits how many times
+    the child runs, it does not require those runs to succeed.
 
     The run count and done flag persist across tree re-entries (i.e. they are
-    NOT reset by initialise()).  This makes Counter suitable for one-time
-    initialization sequences.  To reset and re-count, call reset() explicitly.
+    NOT reset by ``initialise()``).  This makes Counter suitable for one-time
+    initialization sequences.  To reset and re-count, call :meth:`reset`
+    explicitly.
 
     Args:
         child (Behaviour): The child behavior to count.
         name (str): Name of this decorator.
-        num_runs (int): Total number of child completions to allow.
-        completion_status (Status): Status returned permanently once num_runs
-            completions have occurred.  Default SUCCESS.
+        num_runs (int): Total number of child completions to allow.  Must be
+            at least 1.
+        completion_status (Status): Status returned permanently once
+            ``num_runs`` completions have occurred.  Default SUCCESS.
+
+    Raises:
+        ValueError: If ``num_runs`` is less than 1.
 
     Example:
-        child = InitializationBehavior(name="Init")
-        # Run Init exactly once; after it completes, always return SUCCESS.
-        counted = Counter(child, name="RunOnce", num_runs=1)
+        .. testcode::
 
-        child = CalibrateStep(name="Calibrate")
-        # Run calibration exactly 3 times, then always return SUCCESS.
-        counted = Counter(child, name="Calibrate3x", num_runs=3)
+            child = py_trees.behaviours.Success(name="Init")
+            # Run Init exactly once; after it completes, always return SUCCESS.
+            counted = Counter(child, name="RunOnce", num_runs=1)
+
+            child = py_trees.behaviours.Success(name="Calibrate")
+            # Run calibration exactly 3 times, then always return SUCCESS.
+            counted = Counter(child, name="Calibrate3x", num_runs=3)
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,

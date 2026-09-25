@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+"""Control which behaviors run, and when.
+
+Three decorators and a factory, covering the common shapes of "not every tick":
+
+* :class:`ActivateBehavior` — an on/off switch a caller flips from outside the
+  tree.
+* :func:`run_alternating` — cycle through several behaviors, each for a fixed
+  run of consecutive ticks.
+* :class:`RunEveryX` — run the child once every X ticks, X re-drawn from a
+  range after each execution.
+* :class:`RunEveryRange` — run the child during a fixed window of a
+  fixed-length cycle.
+
+Each of the decorators takes a ``success_if_skip`` flag. It decides what a
+skipped tick reports: FAILURE by default, which a parent Selector reads as
+"try the next child", or SUCCESS, which makes the skip invisible to a parent
+Sequence. Which one you want depends entirely on the composite above it.
+"""
 import py_trees
 import random
 from typing import List
@@ -7,13 +25,34 @@ from typing import Tuple
 
 class ActivateBehavior(py_trees.decorators.Decorator):
     '''
-    Enables activation of a behavior from an external source as long as it has a handle to 
+    Enables activation of a behavior from an external source as long as it has a handle to
     this decorator.
 
+    While deactivated the child is not ticked at all — neither its
+    ``initialise`` nor its ``update`` runs — and this decorator reports FAILURE,
+    or SUCCESS if ``success_if_skip`` is set. Flip the :attr:`activate` property
+    to switch the child on and off from outside the tree.
+
+    This is the mechanism behind :func:`run_alternating`, and it is equally
+    usable on its own to gate a branch from application code.
+
     Args:
-        child(Behavior): The child behavior that is being activated or not activated.
-        name(str): Name of this behavior
-        activate(bool): Whether or not to start this behavior activated or not.
+        child (Behaviour): The child behavior that is being activated or not
+            activated.
+        name (str): Name of this behavior.
+        activate (bool): Whether or not to start this behavior activated or not.
+        success_if_skip (bool): Return SUCCESS instead of FAILURE while
+            deactivated. Default False.
+
+    Example:
+        .. testcode::
+
+            child = py_trees.behaviours.Success(name="Child")
+            gate = ActivateBehavior(child, name="Gate", activate=True,
+                                    success_if_skip=True)
+
+            gate.activate = False  # child is skipped, gate returns SUCCESS
+            gate.activate = True   # child runs normally
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,
@@ -46,6 +85,11 @@ class ActivateBehavior(py_trees.decorators.Decorator):
         return self.decorated.status
 
 class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
+    '''Bookkeeper that advances which ActivateBehavior is enabled.
+
+    Always returns FAILURE so the enclosing Selector falls through to the
+    wrapped behaviors after this one has updated the rotation.
+    '''
     def __init__(self, name: str, activatable_behaviors: List[ActivateBehavior], counts: List[int]):
         self._counts = counts
         self._current_behavior_idx = 0
@@ -69,15 +113,45 @@ class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
 
 def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], counts: List[int]):
     '''
-    Args:
-        name(str): Name of the behavior
-        behaviors(List[Behaviors]): List of all the behaviors to run alternating.
-        count(List[int]): A list of how many times the corresponding behavior ought to be ran.
+    Build a Selector that cycles through behaviors, each for a fixed run of ticks.
 
-            Example:
-                A if behaviors is [behavior_a, behavior_b, behavior_c] and count is [3,2,4] then
-                behavior_a will run 3 times in a row, behavior_b will run 2 times in a row, and
-                behavior_c will run 4 times in a row before repeating.
+    The returned Selector holds a private bookkeeping behavior followed by every
+    entry of ``behaviors``, each wrapped in an :class:`ActivateBehavior`. Exactly
+    one wrapper is active at a time; the bookkeeper advances to the next once the
+    current one has run its allotted number of ticks, and wraps around at the
+    end of the list.
+
+    Args:
+        name (str): Name of the behavior.
+        behaviors (List[Behaviour]): List of all the behaviors to run
+            alternating.
+        counts (List[int]): A list of how many times the corresponding behavior
+            ought to be ran. Must be the same length as ``behaviors`` and
+            contain no zeros.
+
+    Returns:
+        py_trees.composites.Selector: The alternating subtree, ready to add to
+        a parent.
+
+    Raises:
+        ValueError: If ``counts`` contains a 0, or the two lists differ in
+            length.
+
+    Example:
+        If ``behaviors`` is ``[behavior_a, behavior_b, behavior_c]`` and
+        ``counts`` is ``[3, 2, 4]`` then behavior_a will run 3 times in a row,
+        behavior_b will run 2 times in a row, and behavior_c will run 4 times in
+        a row before repeating::
+
+            A, A, A, B, B, C, C, C, C, A, A, A, B, B, ...
+
+        .. testcode::
+
+            a = py_trees.behaviours.Success(name="A")
+            b = py_trees.behaviours.Success(name="B")
+            c = py_trees.behaviours.Success(name="C")
+
+            root = run_alternating("Cycle", [a, b, c], [3, 2, 4])
     '''
     if 0 in counts:
         raise ValueError(f'counts({counts}) can not have 0 in the list.')
@@ -99,23 +173,46 @@ def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], co
 
 class RunEveryRange(py_trees.decorators.Decorator):
     '''
-    Enables the activation of child every for a range of calls within
+    Run the child only during a window of iterations within a fixed-length cycle.
+
+    An internal counter runs from 1 to ``max_range`` and then wraps back to 1.
+    The child is ticked while the counter falls inside ``run_range`` inclusive,
+    and skipped otherwise. Unlike :class:`RunEveryX` the pattern is fixed, so
+    the child runs on the same iterations of every cycle.
+
+    On skipped ticks the child is not ticked and this decorator returns FAILURE,
+    or SUCCESS if ``success_if_skip`` is set.
 
     Args:
-        child(Behavior): The child behavior that is being activated or not activated.
-        name(str): Name of this behavior.
-        max_range(int): Maximum number of runs before the iterations resets to 1.
-        run_range(Tuple[int, int]): Determines which range of iterations that the child
-            will execute for. Range is inclusive.
+        child (Behaviour): The child behavior that is being activated or not
+            activated.
+        name (str): Name of this behavior.
+        max_range (int): Number of ticks in a cycle, after which the counter
+            resets to 1.
+        run_range (Tuple[int, int]): Inclusive range of iterations during which
+            the child executes.
+        success_if_skip (bool): Return SUCCESS instead of FAILURE on a skipped
+            tick. Default False.
+
+    Raises:
+        ValueError: If ``run_range`` is reversed, starts below 1, or ends above
+            ``max_range``.
 
     Example:
-        E: Executes that cycle.
-        S: Skips that cycle.
-        if max_range and run_range is:
-            6 and (4,6) the the child will run on the 4th, 5th, and 6th cycle.
+        E marks a tick that executes the child, S a tick that skips it. If
+        ``max_range`` and ``run_range`` are::
+
+            6 and (4,6) then the child will run on the 4th, 5th, and 6th cycle.
                 S, S, S, E, E, E, S, S, S, E, E, E, S, S, S, ...
             6 and (2,4) then the child will run on the 2nd, 3rd, and 4th cycle.
                 S, E, E, E, S, S, S, E, E, E, S, S, S, E, E, ...
+
+        .. testcode::
+
+            child = py_trees.behaviours.Success(name="Child")
+
+            # Run on iterations 4, 5 and 6 of every 10-tick cycle.
+            windowed = RunEveryRange(child, name="Window", max_range=10, run_range=(4, 6))
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,
@@ -156,31 +253,55 @@ class RunEveryRange(py_trees.decorators.Decorator):
 
 class RunEveryX(py_trees.decorators.Decorator):
     '''
-    Enables the activation of child every X calls. X can falls within a range
-    and gets recalculated every success.
+    Run the child once every X ticks, where X is re-drawn after each execution.
+
+    X is sampled from ``every_x_range`` inclusive. A fixed range like ``(5, 5)``
+    gives a strict period; a wider range gives an irregular one, re-rolled every
+    time the child executes, which is useful for behavior that should look
+    unscheduled.
+
+    On skipped ticks the child is not ticked and this decorator returns FAILURE,
+    or SUCCESS if ``success_if_skip`` is set.
 
     Args:
-        child(Behavior): The child behavior that is being activated or not activated.
-        name(str): Name of this behavior
-        every_x_range(Tuple[int, int]): Run the child ever however many cycles. Number of
-        cycles is within a range. Range is inclusive.
+        child (Behaviour): The child behavior that is being activated or not
+            activated.
+        name (str): Name of this behavior.
+        every_x_range (Tuple[int, int]): Inclusive ``(min, max)`` bounds on the
+            number of ticks per cycle. The lower bound must be at least 1.
+        success_if_skip (bool): Return SUCCESS instead of FAILURE on a skipped
+            tick. Default False.
+
+    Raises:
+        ValueError: If the bounds are reversed, or the lower bound is below 1.
 
     Example:
-        E: Executes that cycle.
-        S: Skips that cycle.
-        if every_x_range is:
+        E marks a tick that executes the child, S a tick that skips it. If
+        ``every_x_range`` is::
+
             (1,1) then the child behavior will run every cycle.
                 E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, ...
             (5,5) then the child behavior will run every 5th cycle.
                 S, S, S, S, E, S, S, S, S, E, S, S, S, S, E, ...
             (1,5) then the child behavior will run randomly between every
-            cycle or every 5th cycle. Changes every times it child gets executed.
+            cycle or every 5th cycle. Changes every time the child gets
+            executed.
                 S, S, E, S, S, S, S, E, E, S, S, S, E, S, S, ...
                 The execute cycle above goes:
                     3: S, S, E
                     5: S, S, S, S, E
                     1: E
                     4: S, S, S, E
+
+        .. testcode::
+
+            child = py_trees.behaviours.Success(name="Child")
+
+            # Run exactly every 5th tick.
+            every_5 = RunEveryX(child, name="Every5", every_x_range=(5, 5))
+
+            # Run at a random interval between 1 and 5 ticks.
+            varied = RunEveryX(child, name="Varied", every_x_range=(1, 5))
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,

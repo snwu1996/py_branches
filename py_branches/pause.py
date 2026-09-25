@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+"""Behaviors that hold a tree still for a while.
+
+Four leaf behaviors, differing in where the pause duration comes from:
+
+* :class:`PauseUniform` — a duration drawn uniformly between two bounds.
+* :class:`PausePDF` — a duration drawn from a kernel density estimate fitted
+  to recorded samples, for pauses that mimic observed timing.
+* :class:`PauseUntilKey` — no duration at all; waits for a key press.
+* :class:`PauseSchedule` — waits out a wall-clock window loaded from a YAML
+  file, for behavior that should idle overnight or over lunch.
+
+All of them return RUNNING while the pause is active and SUCCESS once it is
+over, so they tick cooperatively rather than blocking the tree.
+
+:func:`load_schedule_file` turns a YAML schedule into the form
+:class:`PauseSchedule` expects; :func:`datetime_time_to_sec` and
+:func:`add_variance_to_datetime_time` are the time helpers behind it.
+"""
 import logging
 import time
 import py_trees
@@ -24,6 +42,28 @@ def _create_keyboard_listener(on_press):
 
 
 class PauseUniform(py_trees.behaviour.Behaviour):
+    """Pause for a duration drawn uniformly from ``[low, high]``.
+
+    A new duration is sampled on each fresh entry, using :func:`random.uniform`
+    from the standard library.
+
+    The bounds are not validated; ``low`` greater than ``high`` yields samples
+    from the reversed interval, as :func:`random.uniform` permits.
+
+    Args:
+        name (str): Name of this behavior node.
+        low (float): Minimum pause duration in seconds.
+        high (float): Maximum pause duration in seconds.
+
+    Returns:
+        Status: RUNNING until the sampled duration elapses, then SUCCESS.
+
+    Example:
+        .. testcode::
+
+            # Pause for between 2 and 5 seconds.
+            pause = PauseUniform(name="ShortPause", low=2.0, high=5.0)
+    """
     def __init__(self, name: str, low: float, high: float):
         super(PauseUniform, self).__init__(name=name)
         self._high = high
@@ -41,7 +81,52 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.SUCCESS
 
 class PausePDF(py_trees.behaviour.Behaviour):
-    """Pause for a duration sampled from a KDE fit to a file of float samples."""
+    """Pause for a duration sampled from a KDE fit to a file of float samples.
+
+    The file holds one float per line, in seconds; blank lines and lines
+    starting with ``#`` are ignored. A Gaussian kernel density estimate is
+    fitted to those samples once, at construction, and each entry draws a new
+    duration from it.
+
+    Sampling is rejected and retried until the draw falls within
+    ``[min_t, max_t]``, which is what keeps a Gaussian kernel from ever
+    producing a negative pause.
+
+    Warning:
+        The rejection loop has no iteration limit. Bounds that exclude
+        essentially all of the fitted distribution's mass will hang
+        ``initialise()``, so keep ``min_t`` and ``max_t`` consistent with the
+        sample data.
+
+    Args:
+        name (str): Name of this behavior node.
+        filepath (str): Path to the newline-separated sample file.
+        kernel_bandwidth (float): Bandwidth of the Gaussian kernel. Larger
+            values smooth the fitted distribution. Default 1.0.
+        min_t (float): Lower bound on the sampled pause, in seconds.
+            Default 0.0.
+        max_t (float): Upper bound on the sampled pause, in seconds. Default
+            unbounded.
+
+    Returns:
+        Status: RUNNING until the sampled duration elapses, then SUCCESS.
+
+    Raises:
+        FileNotFoundError: If ``filepath`` is not a file.
+        AssertionError: If the file contains no usable samples.
+
+    Example:
+        .. code-block:: python
+
+            # Draw human-like think times from recorded data, clamped to
+            # between 1 and 30 seconds.
+            pause = PausePDF(
+                name="ThinkTime",
+                filepath="data/think_times.txt",
+                min_t=1.0,
+                max_t=30.0,
+            )
+    """
 
     def __init__(
         self,
@@ -90,6 +175,29 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
     ``key`` is a pynput key string: a single character like ``'a'``, or a
     special key name like ``'space'``, ``'enter'``, ``'esc'`` (matching
     ``pynput.keyboard.Key`` names).
+
+    A fresh listener is started on each entry and stopped on termination, so
+    key presses that arrive while this behavior is not running are ignored.
+
+    pynput is imported only when a listener is created, which keeps this module
+    importable on a headless machine; constructing and ticking this behavior
+    does still require an accessible input device.
+
+    Args:
+        name (str): Name of this behavior node.
+        key (str): Key to wait for.
+        listener_factory: Callable taking an ``on_press`` keyword and returning
+            an object with ``start()`` and ``stop()``. Defaults to a real
+            pynput listener; override it to supply a fake in tests.
+
+    Returns:
+        Status: RUNNING until the key is pressed, then SUCCESS.
+
+    Example:
+        .. testcode::
+
+            # Hold the tree until the operator presses space.
+            gate = PauseUntilKey(name="WaitForSpace", key="space")
     """
 
     def __init__(self, name: str, key: str, listener_factory=_create_keyboard_listener):
@@ -132,6 +240,46 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
 
 
 def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]] | None:
+    """Load a YAML pause schedule and pre-compute its variance offsets.
+
+    Each entry in the file defines a pause window as wall-clock times in
+    ``HH:MM:SS`` form, plus a variance read as a duration:
+
+    .. code-block:: yaml
+
+        - start_pause_time: "22:30:00"
+          stop_pause_time: "6:30:00"
+          variance: "0:30:00"
+        - start_pause_time: "12:30:00"
+          stop_pause_time: "16:30:00"
+          variance: "0:30:00"
+
+    The returned dicts carry both the times as written and the variance-shifted
+    times that :class:`PauseSchedule` actually matches against, under the keys
+    ``start_pause_time``, ``stop_pause_time``, ``variance_time``,
+    ``start_plus_variance_time`` and ``stop_plus_variance_time``.
+
+    Variance is applied independently to the start and the stop time, and only
+    ever shifts them later — see :func:`add_variance_to_datetime_time`. A
+    window whose stop time precedes its start time is treated as crossing
+    midnight.
+
+    Args:
+        schedule_filepath (str): Path to the YAML schedule file.
+
+    Returns:
+        A list of schedule entries ready to pass to :class:`PauseSchedule`, or
+        None if the file parsed as empty (blank, or comments only), in which
+        case the failure is logged rather than raised.
+
+    Raises:
+        FileNotFoundError: If ``schedule_filepath`` is not a file.
+
+    Example:
+        .. code-block:: python
+
+            schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
+    """
     if not os.path.isfile(schedule_filepath):
         raise FileNotFoundError(f'schedule_filepath: {schedule_filepath} is not a valid file')
     
@@ -155,10 +303,34 @@ def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]]
     return schedule
 
 def datetime_time_to_sec(t: datetime.time):
+    """Convert a time of day to seconds since midnight.
+
+    Sub-second precision is discarded.
+
+    Args:
+        t (datetime.time): Time to convert.
+
+    Returns:
+        int: Seconds elapsed since midnight.
+    """
     sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
     return sec
 
 def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time) -> datetime.time:
+    """Offset a time by a random amount drawn from ``[0, variance_time]``.
+
+    The offset is always forward in time — it is drawn from zero to the full
+    variance, never negative — and wraps past midnight if the sum exceeds
+    24 hours.
+
+    Args:
+        t (datetime.time): Base time.
+        variance_time (datetime.time): Upper bound of the offset, read as a
+            duration, e.g. ``datetime.time(0, 30, 0)`` for up to 30 minutes.
+
+    Returns:
+        datetime.time: ``t`` plus the sampled offset.
+    """
     variance_sec = datetime_time_to_sec(variance_time)
     variance_timedelta = datetime.timedelta(seconds=random.uniform(0.0, variance_sec))
     time_to_datetime = datetime.datetime.combine(datetime.date.today(), t)
@@ -166,6 +338,48 @@ def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time
     return time_with_variance
 
 class PauseSchedule(py_trees.behaviour.Behaviour):
+    """Pause until the end of the schedule window that is active right now.
+
+    On each fresh entry this behavior looks for a window containing the current
+    wall-clock time. If it finds one, it computes the seconds remaining until
+    that window's (variance-adjusted) stop time and stays RUNNING for that long.
+    If the current time falls outside every window, it returns SUCCESS
+    immediately, so the behavior is cheap to tick continuously.
+
+    Two pieces of state keep it from misbehaving across long runs:
+
+    * A window that has already been handled will not pause again, even while
+      the clock is still inside it. Re-arming happens once the current time has
+      left every window.
+    * After handling a window, fresh variance offsets are drawn for that
+      window's start and stop times, so the boundaries differ from day to day.
+
+    Windows that cross midnight are matched correctly, and the remaining-time
+    calculation wraps through midnight as well.
+
+    Args:
+        name (str): Name of this behavior node.
+        schedule (List[Dict[str, datetime.time]]): Preprocessed schedule, as
+            returned by :func:`load_schedule_file`.
+
+    Returns:
+        Status: SUCCESS when outside all windows or once the active window's
+        stop time is reached; RUNNING until then.
+
+    Example:
+        .. code-block:: python
+
+            from py_branches.pause import PauseSchedule, load_schedule_file
+
+            schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
+            if schedule is None:
+                raise SystemExit("schedule file is empty")
+
+            pause = PauseSchedule(name="ScheduledPause", schedule=schedule)
+
+            root = py_trees.composites.Sequence(name="Root", memory=True)
+            root.add_children([pause, main_behavior])
+    """
     def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
         self._schedule = schedule
         self._last_schedule_idx = None

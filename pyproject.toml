@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py_branches"
-version = "1.4.0"
+version = "1.5.0"
 description = "Useful behaviors built on top of the py_trees library."
 authors = ["Shunong Wu <shunongwu@gmail.com>"]
 license = "BSD"
@@ -33,6 +33,12 @@ scikit-learn = "*"
 pytest = "*"
 pytest-cov = "*"
 pyright = "^1.1.414"
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^8.1"
+sphinx-rtd-theme = "^3.0"
+myst-parser = "^4.0"
+sphinx-autodoc-typehints = "^2.5"
 
 [build-system]
 requires = ["poetry-core"]

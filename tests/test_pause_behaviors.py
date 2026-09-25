@@ -51,7 +51,10 @@ def test_pause_uniform():
 
 
 def test_pause_schedule_pauses_at_scheduled_time():
-    now_dt = datetime.datetime.now()
+    # Whole-second boundary: datetime_time_to_sec truncates microseconds, so a
+    # schedule built from a sub-second timestamp makes t_wait off by up to a
+    # second depending on when the test happened to start.
+    now_dt = datetime.datetime.now().replace(microsecond=0)
     start_dt = now_dt + datetime.timedelta(seconds=3)
     stop_dt = now_dt + datetime.timedelta(seconds=6)
     start_t = start_dt.time()
