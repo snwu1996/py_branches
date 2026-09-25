@@ -39,7 +39,7 @@ class Retry(py_trees.decorators.Decorator):
         self._delay = delay
         self._attempts = 0
         self._waiting = False
-        self._wait_start = None
+        self._wait_start: float | None = None
 
     def initialise(self) -> None:
         self._attempts = 0
@@ -47,7 +47,7 @@ class Retry(py_trees.decorators.Decorator):
         self._wait_start = None
 
     def tick(self):
-        if self._waiting:
+        if self._waiting and self._wait_start is not None:
             elapsed = time.time() - self._wait_start
             if elapsed < self._delay:
                 self.status = py_trees.common.Status.RUNNING

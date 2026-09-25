@@ -142,6 +142,7 @@ def test_pause_until_key():
     b = PauseUntilKey('pause_until_key', 'a', listener_factory=FakeKeyboardListener)
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
+    assert b._listener is not None
     assert b._listener.started
     b.tick_once()
     assert b.status == py_trees.common.Status.RUNNING
