@@ -28,10 +28,18 @@ scikit-learn = "*"
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
 pytest-cov = "*"
+pyright = "^1.1.414"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+include = ["py_branches", "tests"]
+typeCheckingMode = "basic"
+# No venvPath/venv: pyright resolves imports from whichever interpreter is on
+# PATH, so `poetry run pyright` works against the active venv both locally and
+# in CI, wherever poetry puts it.
 
 [tool.coverage.run]
 source = ["py_branches"]

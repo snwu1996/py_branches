@@ -58,6 +58,36 @@ jobs:
           # A silent upload failure would freeze the badge at a stale number.
           fail_ci_if_error: true
 
+  types:
+    # Advisory only: pyright findings are reported but never fail the build.
+    # Drop continue-on-error once the existing errors are cleared to make it
+    # a real gate.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run pyright
+        # Runs inside the venv so third-party imports resolve; without that
+        # the output is mostly unresolved-import noise.
+        run: poetry run pyright
+
   version:
     # Release PRs must bump the version; label a PR 'no-version-bump' to skip.
     if: >-
