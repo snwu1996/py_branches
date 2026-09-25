@@ -1,30 +1,47 @@
 #!/usr/bin/env python3
+"""Retry a failing child behavior, optionally with a delay.
+
+A single decorator, :class:`Retry`, for flaky operations that are worth
+attempting more than once.
+"""
 import time
 import py_trees
 
 
 class Retry(py_trees.decorators.Decorator):
     '''
-    Retries a child behavior on FAILURE up to max_attempts times.
+    Retries a child behavior on FAILURE up to ``max_attempts`` times.
 
     Returns SUCCESS if the child ever succeeds, FAILURE once all attempts
-    are exhausted.  Stays RUNNING between attempts (and during optional
-    delay between retries).
+    are exhausted.  Stays RUNNING between attempts (and during the optional
+    delay between retries), so a retry cycle spans several ticks rather than
+    blocking inside one.
+
+    The attempt counter resets in ``initialise()``, so each fresh entry into
+    this decorator gets a full budget of ``max_attempts``.
 
     Args:
         child (Behaviour): The child behavior to retry.
         name (str): Name of this decorator.
         max_attempts (int): Maximum number of times to attempt the child.
-        delay (float): Seconds to wait between retry attempts. Default 0.0.
+            Must be at least 1.
+        delay (float): Seconds to wait between retry attempts. Must be
+            non-negative. Default 0.0.
+
+    Raises:
+        ValueError: If ``max_attempts`` is less than 1, or ``delay`` is
+            negative.
 
     Example:
-        child = py_trees.behaviours.Failure(name="Flaky")
-        # Try up to 3 times; fails permanently after 3 failures.
-        retry = Retry(child, name="Retry", max_attempts=3)
+        .. code-block:: python
 
-        child = py_trees.behaviours.Failure(name="Flaky")
-        # Try up to 3 times with 1 second between each attempt.
-        retry = Retry(child, name="RetryWithDelay", max_attempts=3, delay=1.0)
+            child = py_trees.behaviours.Failure(name="Flaky")
+            # Try up to 3 times; fails permanently after 3 failures.
+            retry = Retry(child, name="Retry", max_attempts=3)
+
+            child = py_trees.behaviours.Failure(name="Flaky")
+            # Try up to 3 times with 1 second between each attempt.
+            retry = Retry(child, name="RetryWithDelay", max_attempts=3, delay=1.0)
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,

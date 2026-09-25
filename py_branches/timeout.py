@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Bound how long a child behavior may stay RUNNING.
+
+A single decorator, :class:`Timeout`, which converts an over-running child
+into a FAILURE so a tree cannot stall indefinitely on one branch.
+"""
 import time
 import py_trees
 
@@ -10,17 +15,27 @@ class Timeout(py_trees.decorators.Decorator):
     - If the child returns SUCCESS or FAILURE before the timeout, that
       status is passed through unchanged.
     - If the child is still RUNNING when the timeout expires, the child is
-      stopped and FAILURE is returned.
+      stopped (set to INVALID) and FAILURE is returned.
+
+    The clock starts in ``initialise()``, i.e. on each fresh entry. The
+    duration therefore bounds one uninterrupted RUNNING stretch, not the
+    total time the child has ever spent running.
 
     Args:
         child (Behaviour): The child behavior to wrap with a timeout.
         name (str): Name of this decorator.
         duration (float): Maximum seconds the child may remain RUNNING.
+            Must be positive.
+
+    Raises:
+        ValueError: If ``duration`` is not positive.
 
     Example:
-        child = LongRunningBehavior(name="Slow")
-        # Fail if child does not complete within 5 seconds.
-        guarded = Timeout(child, name="Timeout", duration=5.0)
+        .. code-block:: python
+
+            child = LongRunningBehavior(name="Slow")
+            # Fail if child does not complete within 5 seconds.
+            guarded = Timeout(child, name="Timeout", duration=5.0)
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,

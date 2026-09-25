@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Rate-limit how often a child behavior may run.
+
+A single decorator, :class:`Cooldown`, which enforces a minimum gap between
+completions of its child.
+"""
 import time
 import py_trees
 
@@ -11,23 +16,32 @@ class Cooldown(py_trees.decorators.Decorator):
     The child runs normally on the first tick.  Once it completes (SUCCESS or
     FAILURE), a cooldown timer starts.  During the cooldown, the child is not
     ticked and this decorator returns FAILURE (or SUCCESS if
-    success_if_cooling=True).  After the cooldown expires the child may run
-    again.
+    ``success_if_cooling=True``).  After the cooldown expires the child may
+    run again.
 
     A child that stays RUNNING is never subject to the cooldown — the timer
     only starts once the child actually finishes.
+
+    The cooldown timer is wall-clock based and is not reset by re-entering the
+    tree, so the gap holds across separate activations.
 
     Args:
         child (Behaviour): The child behavior to rate-limit.
         name (str): Name of this decorator.
         duration (float): Cooldown period in seconds after each completion.
+            Must be positive.
         success_if_cooling (bool): Return SUCCESS instead of FAILURE while
             cooling down.  Default False.
 
+    Raises:
+        ValueError: If ``duration`` is not positive.
+
     Example:
-        child = py_trees.behaviours.Success(name="Expensive")
-        # Run child freely, but enforce a 5-second gap between executions.
-        cooled = Cooldown(child, name="Cooldown", duration=5.0)
+        .. code-block:: python
+
+            child = py_trees.behaviours.Success(name="Expensive")
+            # Run child freely, but enforce a 5-second gap between executions.
+            cooled = Cooldown(child, name="Cooldown", duration=5.0)
     '''
     def __init__(self, child: py_trees.behaviour.Behaviour,
                        name: str,

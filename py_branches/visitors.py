@@ -1,5 +1,19 @@
-"""Visitors for py_trees behavior trees."""
+"""Visitors for py_trees behavior trees.
 
+A visitor is attached to a tree's tick machinery and called once per behavior
+per tick, which makes it the right place for observability that should not
+change the tree's shape:
+
+* :class:`StatusTransitionVisitor` — log each leaf's status, but only when it
+  changes, keeping the output readable on a tree that ticks quickly.
+* :class:`TimerVisitor` — log how long each behavior spent RUNNING.
+
+.. code-block:: python
+
+    tree = py_trees.trees.BehaviourTree(root)
+    tree.visitors.append(StatusTransitionVisitor())
+    tree.visitors.append(TimerVisitor())
+"""
 import logging
 import time
 import uuid
