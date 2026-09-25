@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import logging
 
 import py_trees
 import pytest
@@ -34,11 +35,22 @@ def _write_schedule(path, entries):
     return str(path)
 
 
+def _load(path):
+    """load_schedule_file narrowed to a list.
+
+    The real function returns None for a file YAML reads as empty; every test
+    using this helper writes entries, so None here is itself a failure.
+    """
+    schedule = load_schedule_file(path)
+    assert schedule is not None
+    return schedule
+
+
 def test_load_schedule_file_parses_times(tmp_path):
     fp = _write_schedule(tmp_path / 'schedule.yaml',
                          [('09:30:00', '17:45:30', '00:00:00')])
 
-    schedule = load_schedule_file(fp)
+    schedule = _load(fp)
 
     assert len(schedule) == 1
     element = schedule[0]
@@ -53,7 +65,7 @@ def test_load_schedule_file_zero_variance_leaves_times_unchanged(tmp_path):
     fp = _write_schedule(tmp_path / 'schedule.yaml',
                          [('09:30:00', '17:45:30', '00:00:00')])
 
-    element = load_schedule_file(fp)[0]
+    element = _load(fp)[0]
 
     assert element['start_plus_variance_time'] == element['start_pause_time']
     assert element['stop_plus_variance_time'] == element['stop_pause_time']
@@ -63,7 +75,7 @@ def test_load_schedule_file_applies_variance_within_bounds(tmp_path):
     fp = _write_schedule(tmp_path / 'schedule.yaml',
                          [('09:30:00', '17:45:30', '00:10:00')])
 
-    element = load_schedule_file(fp)[0]
+    element = _load(fp)[0]
 
     for base_key, varied_key in (('start_pause_time', 'start_plus_variance_time'),
                                  ('stop_pause_time', 'stop_plus_variance_time')):
@@ -79,7 +91,7 @@ def test_load_schedule_file_preserves_entry_order(tmp_path):
         ('05:00:00', '06:00:00', '00:00:00'),
     ])
 
-    schedule = load_schedule_file(fp)
+    schedule = _load(fp)
 
     assert [e['start_pause_time'] for e in schedule] == [
         datetime.time(1, 0, 0),
@@ -92,7 +104,7 @@ def test_load_schedule_file_handles_overnight_window(tmp_path):
     fp = _write_schedule(tmp_path / 'schedule.yaml',
                          [('23:00:00', '01:00:00', '00:00:00')])
 
-    element = load_schedule_file(fp)[0]
+    element = _load(fp)[0]
 
     # A window that wraps past midnight is stored as-is, start later than stop.
     assert element['start_pause_time'] == datetime.time(23, 0, 0)
@@ -111,6 +123,26 @@ def test_load_schedule_file_malformed_time_raises(tmp_path):
 
     with pytest.raises(ValueError):
         load_schedule_file(fp)
+
+
+def test_load_schedule_file_empty_file_returns_none(tmp_path, caplog):
+    # An empty file is not an error: the loader logs and returns None so the
+    # caller decides what to do.
+    fp = tmp_path / 'schedule.yaml'
+    fp.write_text('')
+
+    with caplog.at_level(logging.ERROR):
+        assert load_schedule_file(str(fp)) is None
+
+    assert 'Failed to load schedule_file' in caplog.text
+
+
+def test_load_schedule_file_comments_only_returns_none(tmp_path):
+    # YAML reads a comment-only file as empty, same as a blank one.
+    fp = tmp_path / 'schedule.yaml'
+    fp.write_text('# no entries yet\n')
+
+    assert load_schedule_file(str(fp)) is None
 
 
 def test_load_schedule_file_missing_key_raises(tmp_path):
@@ -133,7 +165,7 @@ def test_load_schedule_file_output_drives_pause_schedule(tmp_path):
         '00:00:00',
     )])
 
-    pause_schedule = PauseSchedule('pause_schedule', load_schedule_file(fp))
+    pause_schedule = PauseSchedule('pause_schedule', _load(fp))
     pause_schedule.tick_once()
 
     # Outside every window, so no pause is scheduled.

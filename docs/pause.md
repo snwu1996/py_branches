@@ -51,7 +51,7 @@ load_schedule_file(file_path)
 |---|---|---|
 | `file_path` | `str` | Path to the YAML schedule file |
 
-**Returns:** A preprocessed schedule list suitable for passing to `PauseSchedule`.
+**Returns:** A preprocessed schedule list suitable for passing to `PauseSchedule`, or `None` if YAML reads the file as empty (blank or comments only), in which case the failure is logged. Raises `FileNotFoundError` if the path is not a file.
 
 **YAML format**
 
@@ -102,6 +102,9 @@ import py_trees
 from py_branches.pause import load_schedule_file, PauseSchedule
 
 schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
+if schedule is None:
+    raise SystemExit("schedule file is empty")
+
 pause = PauseSchedule(name="ScheduledPause", schedule=schedule)
 
 root = py_trees.composites.Sequence(name="Root", memory=True)

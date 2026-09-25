@@ -58,7 +58,7 @@ jobs:
           # A silent upload failure would freeze the badge at a stale number.
           fail_ci_if_error: true
 
-  types:
+  pyright:
     # Advisory only: pyright findings are reported but never fail the build.
     # Drop continue-on-error once the existing errors are cleared to make it
     # a real gate.

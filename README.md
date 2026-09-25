@@ -102,6 +102,8 @@ pause = PauseUniform(name="RandomPause", low=1.0, high=3.0)
 from py_branches.pause import load_schedule_file, PauseSchedule
 
 schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
+if schedule is None:
+    raise SystemExit("schedule file is empty")
 
 # Pauses until the current scheduled window ends; SUCCESS immediately if
 # outside all windows.

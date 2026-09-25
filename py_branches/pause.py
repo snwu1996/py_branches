@@ -131,15 +131,19 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
             self._listener = None
 
 
-def load_schedule_file(schedule_filepath: str):
+def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]] | None:
     if not os.path.isfile(schedule_filepath):
         raise FileNotFoundError(f'schedule_filepath: {schedule_filepath} is not a valid file')
     
     with open(schedule_filepath, 'r') as schedule_file:
         schedule_raw = yaml.safe_load(schedule_file)
 
+    if schedule_raw is None:
+        logging.error(f'Failed to load schedule_file: {schedule_filepath}')
+        return None
+
     schedule = []
-    for schedule_element_raw in schedule_raw: # pyright: ignore
+    for schedule_element_raw in schedule_raw:
         start_pause_time = datetime.datetime.strptime(schedule_element_raw['start_pause_time'], '%H:%M:%S').time()
         stop_pause_time = datetime.datetime.strptime(schedule_element_raw['stop_pause_time'], '%H:%M:%S').time()
         variance_time = datetime.datetime.strptime(schedule_element_raw['variance'], '%H:%M:%S').time()
