@@ -45,6 +45,7 @@ extensions = [
     'sphinx_autodoc_typehints',
     'myst_parser',
     'render_trees',
+    'sphinx_sitemap',
 ]
 
 templates_path = ['_templates']
@@ -108,6 +109,20 @@ intersphinx_mapping = {
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 html_title = f'{project} {version}'
+
+# Read the Docs serves the same pages under /latest/ and /stable/. Without a
+# base URL Sphinx emits no canonical link, so search engines treat those as
+# duplicates and split the ranking between them. This points every page at the
+# version the badge and the README link to.
+html_baseurl = 'https://py-branches.readthedocs.io/en/latest/'
+
+# -- Sitemap ------------------------------------------------------------------
+
+# sphinx-sitemap defaults to templating {version} and {lang} into every URL,
+# which is right for a multi-version build. This build is published at one
+# canonical prefix (html_baseurl above), so the entries are written straight
+# under it.
+sitemap_url_scheme = '{link}'
 
 html_theme_options = {
     'navigation_depth': 3,

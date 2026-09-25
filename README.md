@@ -5,7 +5,9 @@
 [![PyPI](https://img.shields.io/pypi/v/py_branches)](https://pypi.org/project/py_branches/)
 [![Docs](https://readthedocs.org/projects/py-branches/badge/?version=latest)](https://py-branches.readthedocs.io/en/latest/)
 
-`py_branches` provides higher-level functionality designed to sit on top of the [py_trees](https://py-trees.readthedocs.io/) library. It extends py_trees with reusable behaviors and decorators for common patterns such as alternating execution, probabilistic selection, blackboard-driven conditionals, and time-based pausing.
+**Reusable behavior-tree behaviors and decorators for Python, built on [py_trees](https://py-trees.readthedocs.io/).**
+
+`py_branches` provides higher-level functionality designed to sit on top of the [py_trees](https://py-trees.readthedocs.io/) library. py_trees supplies the machinery for behavior trees; this package supplies the patterns that otherwise get rewritten on top of it — alternating execution, probabilistic selection, blackboard-driven conditionals, cooldowns, run caps, latching, retries, timeouts, and time-based pausing.
 
 ## Installation
 
@@ -25,10 +27,16 @@ pip install -e .
 
 | Module | Description |
 |---|---|
-| `alternating` | Cycle through behaviors in fixed patterns or run a child every N ticks |
-| `blackboard` | Read/write/gate behaviors based on py_trees blackboard variables |
-| `pause` | Time-based pauses — uniform random duration or YAML-defined schedules |
-| `random` | Probabilistic behavior execution and weighted random selectors |
+| [`alternating`](https://py-branches.readthedocs.io/en/latest/alternating.html) | Cycle through behaviors in fixed patterns, or run a child every N ticks |
+| [`blackboard`](https://py-branches.readthedocs.io/en/latest/blackboard.html) | Read, write, and gate execution on py_trees blackboard variables |
+| [`cooldown`](https://py-branches.readthedocs.io/en/latest/cooldown.html) | Enforce a minimum time gap between runs of a child |
+| [`counter`](https://py-branches.readthedocs.io/en/latest/counter.html) | Cap the total number of times a child runs |
+| [`latch`](https://py-branches.readthedocs.io/en/latest/latch.html) | Make a child's first SUCCESS permanent |
+| [`pause`](https://py-branches.readthedocs.io/en/latest/pause.html) | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
+| [`random`](https://py-branches.readthedocs.io/en/latest/random.html) | Probabilistic execution and weighted random selection |
+| [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child that fails, optionally with a delay |
+| [`timeout`](https://py-branches.readthedocs.io/en/latest/timeout.html) | Fail a child that stays RUNNING too long |
+| [`visitors`](https://py-branches.readthedocs.io/en/latest/visitors.html) | Log status transitions and time spent RUNNING |
 
 ## Basic Usage
 
@@ -127,6 +135,51 @@ a = py_trees.behaviours.Success(name="A")
 b = py_trees.behaviours.Success(name="B")
 c = py_trees.behaviours.Success(name="C")
 selector = random_selector("WeightedSel", [a, b, c], [0.2, 0.3, 0.5])
+```
+
+### Cooldown, Counter, Latch — limit how often a child runs
+
+```python
+import py_trees
+from py_branches.cooldown import Cooldown
+from py_branches.counter import Counter
+from py_branches.latch import Latch
+
+child = py_trees.behaviours.Success(name="Child")
+
+# At most one run every 10 seconds; FAILURE while still cooling down
+cooled = Cooldown(child, name="Cooldown", duration=10.0)
+
+# Run at most 3 times, then report SUCCESS without ticking the child again
+capped = Counter(child, name="Counter", num_runs=3)
+
+# Once the child succeeds, keep reporting SUCCESS forever
+latched = Latch(child, name="Latch")
+```
+
+### Retry and Timeout — bound failure and duration
+
+```python
+from py_branches.retry import Retry
+from py_branches.timeout import Timeout
+
+# Re-run on FAILURE up to 3 attempts, waiting 0.5s between them
+retried = Retry(child, name="Retry", max_attempts=3, delay=0.5)
+
+# FAILURE if the child stays RUNNING for more than 2 seconds
+bounded = Timeout(child, name="Timeout", duration=2.0)
+```
+
+### Visitors — see what the tree actually did
+
+```python
+from py_branches.visitors import StatusTransitionVisitor, TimerVisitor
+
+tree = py_trees.trees.BehaviourTree(root=child)
+
+# Log a line only when a leaf changes status, and time every RUNNING stretch
+tree.visitors.append(StatusTransitionVisitor())
+tree.visitors.append(TimerVisitor())
 ```
 
 ## Running Tests
