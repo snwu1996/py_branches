@@ -1,0 +1,192 @@
+name: Release questionnaire
+
+# A bot comment on every PR asking whether the merge should cut a tag release.
+# The comment is the form; merging is the submit button. On merge the same
+# comment is re-read and, if 'Yes' is ticked, the version in pyproject.toml is
+# tagged and the reusable publish workflow runs.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ask:
+    # Post the questionnaire, or refresh its version line after a push while
+    # carrying over whatever is already ticked.
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The base branch's pyproject.toml is needed to say whether the
+          # version actually moved.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # 3.11+ for stdlib tomllib; the script needs nothing third-party.
+          python-version: "3.12"
+
+      - name: Read versions
+        id: versions
+        run: |
+          read_version() {
+            python -c "import sys,tomllib;print(tomllib.load(open(sys.argv[1],'rb'))['tool']['poetry']['version'])" "$1"
+          }
+          git show "origin/${{ github.base_ref }}:pyproject.toml" > "$RUNNER_TEMP/base-pyproject.toml"
+          echo "head=$(read_version pyproject.toml)" >> "$GITHUB_OUTPUT"
+          echo "base=$(read_version "$RUNNER_TEMP/base-pyproject.toml")" >> "$GITHUB_OUTPUT"
+
+      - name: Find an existing questionnaire
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --jq over the paginated comment list; the marker identifies ours.
+          comment_id=$(gh api --paginate \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '.[] | select(.body | contains("<!-- release-questionnaire -->")) | .id' | tail -n 1)
+          echo "id=$comment_id" >> "$GITHUB_OUTPUT"
+          if [ -n "$comment_id" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$comment_id" \
+              --jq .body > "$RUNNER_TEMP/previous.md"
+          fi
+
+      - name: Render the questionnaire
+        run: |
+          python scripts/release_questionnaire.py render \
+            --head-version "${{ steps.versions.outputs.head }}" \
+            --base-version "${{ steps.versions.outputs.base }}" \
+            --base-ref "${{ github.base_ref }}" \
+            ${{ steps.existing.outputs.id && '--preserve-from "$RUNNER_TEMP/previous.md"' || '' }} \
+            > "$RUNNER_TEMP/body.md"
+
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ steps.existing.outputs.id }}" ]; then
+            gh api -X PATCH \
+              "repos/${{ github.repository }}/issues/comments/${{ steps.existing.outputs.id }}" \
+              -F body=@"$RUNNER_TEMP/body.md"
+          else
+            gh api -X POST \
+              "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+              -F body=@"$RUNNER_TEMP/body.md"
+          fi
+
+  validate:
+    # Ticking a box edits the comment; catch contradictory answers right then
+    # rather than at merge, when it is too late to be useful.
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '<!-- release-questionnaire -->')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the answers are coherent
+        env:
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          printf '%s' "$BODY" > "$RUNNER_TEMP/body.md"
+          python scripts/release_questionnaire.py parse --body-file "$RUNNER_TEMP/body.md"
+
+  tag:
+    # The actual submit: read the answers off the merged PR and act on them.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      tagged: ${{ steps.answers.outputs.tag }}
+      tag_name: ${{ steps.tagging.outputs.tag_name }}
+      github_release: ${{ steps.answers.outputs.github_release }}
+      prerelease: ${{ steps.answers.outputs.prerelease }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tag the merge commit itself, and fetch tags so an existing tag is
+          # detected before we try to push a duplicate.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read the questionnaire
+        id: answers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          comment_id=$(gh api --paginate \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '.[] | select(.body | contains("<!-- release-questionnaire -->")) | .id' | tail -n 1)
+          if [ -n "$comment_id" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$comment_id" \
+              --jq .body > "$RUNNER_TEMP/body.md"
+          fi
+          if [ ! -s "$RUNNER_TEMP/body.md" ]; then
+            # No questionnaire on the PR (e.g. it predates this workflow):
+            # the safe reading is "do not release".
+            echo "tag=false" >> "$GITHUB_OUTPUT"
+            echo "github_release=false" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python scripts/release_questionnaire.py parse \
+            --body-file "$RUNNER_TEMP/body.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push the tag
+        id: tagging
+        if: steps.answers.outputs.tag == 'true'
+        run: |
+          version=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['tool']['poetry']['version'])")
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists; bump the version before releasing." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag (#${{ github.event.pull_request.number }})"
+          git push origin "$tag"
+          echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub Release
+        if: steps.answers.outputs.github_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tagging.outputs.tag_name }}" \
+            --generate-notes \
+            ${{ steps.answers.outputs.prerelease == 'true' && '--prerelease' || '' }}
+
+  publish:
+    # A tag pushed with GITHUB_TOKEN does not trigger the push-on-tag workflow,
+    # so publishing is invoked directly instead of waiting for that trigger.
+    needs: tag
+    if: needs.tag.outputs.tagged == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: ${{ needs.tag.outputs.tag_name }}
+    secrets: inherit
