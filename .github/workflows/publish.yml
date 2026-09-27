@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  # Called by release-questionnaire.yml after it pushes a tag: a tag pushed
+  # with GITHUB_TOKEN never fires the push trigger above.
+  workflow_call:
+    inputs:
+      ref:
+        description: "Tag or ref to build and publish."
+        type: string
+        required: true
 
 jobs:
   publish:
@@ -11,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
