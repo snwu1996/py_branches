@@ -4,12 +4,13 @@
 A single decorator, :class:`Retry`, for flaky operations that are worth
 attempting more than once.
 """
+
 import time
 import py_trees
 
 
 class Retry(py_trees.decorators.Decorator):
-    '''
+    """
     Retries a child behavior on FAILURE up to ``max_attempts`` times.
 
     Returns SUCCESS if the child ever succeeds, FAILURE once all attempts
@@ -42,15 +43,19 @@ class Retry(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Failure(name="Flaky")
             # Try up to 3 times with 1 second between each attempt.
             retry = Retry(child, name="RetryWithDelay", max_attempts=3, delay=1.0)
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       max_attempts: int,
-                       delay: float = 0.0):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        max_attempts: int,
+        delay: float = 0.0,
+    ):
         if max_attempts < 1:
-            raise ValueError(f'max_attempts({max_attempts}) must be greater than 0.')
+            raise ValueError(f"max_attempts({max_attempts}) must be greater than 0.")
         if delay < 0.0:
-            raise ValueError(f'delay({delay}) must be non-negative.')
+            raise ValueError(f"delay({delay}) must be non-negative.")
         super(Retry, self).__init__(name=name, child=child)
         self._max_attempts = max_attempts
         self._delay = delay

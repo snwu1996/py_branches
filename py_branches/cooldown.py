@@ -4,12 +4,13 @@
 A single decorator, :class:`Cooldown`, which enforces a minimum gap between
 completions of its child.
 """
+
 import time
 import py_trees
 
 
 class Cooldown(py_trees.decorators.Decorator):
-    '''
+    """
     Prevents a child from running again until a cooldown period has elapsed
     after its last completion.
 
@@ -42,13 +43,17 @@ class Cooldown(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Success(name="Expensive")
             # Run child freely, but enforce a 5-second gap between executions.
             cooled = Cooldown(child, name="Cooldown", duration=5.0)
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       duration: float,
-                       success_if_cooling: bool = False):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        duration: float,
+        success_if_cooling: bool = False,
+    ):
         if duration <= 0.0:
-            raise ValueError(f'duration({duration}) must be positive.')
+            raise ValueError(f"duration({duration}) must be positive.")
         super(Cooldown, self).__init__(name=name, child=child)
         self._duration = duration
         self._success_if_cooling = success_if_cooling

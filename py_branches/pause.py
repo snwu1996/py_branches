@@ -17,6 +17,7 @@ over, so they tick cooperatively rather than blocking the tree.
 :class:`PauseSchedule` expects; :func:`datetime_time_to_sec` and
 :func:`add_variance_to_datetime_time` are the time helpers behind it.
 """
+
 import logging
 import time
 import py_trees
@@ -38,6 +39,7 @@ MIN2SEC = 60
 def _create_keyboard_listener(on_press):
     # Import lazily so headless CI can import this module without an X server.
     from pynput import keyboard
+
     return keyboard.Listener(on_press=on_press)
 
 
@@ -64,6 +66,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             # Pause for between 2 and 5 seconds.
             pause = PauseUniform(name="ShortPause", low=2.0, high=5.0)
     """
+
     def __init__(self, name: str, low: float, high: float):
         super(PauseUniform, self).__init__(name=name)
         self._high = high
@@ -79,6 +82,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.RUNNING
         else:
             return py_trees.common.Status.SUCCESS
+
 
 class PausePDF(py_trees.behaviour.Behaviour):
     """Pause for a duration sampled from a KDE fit to a file of float samples.
@@ -134,33 +138,33 @@ class PausePDF(py_trees.behaviour.Behaviour):
         filepath: str,
         kernel_bandwidth: float = 1.0,
         min_t: float = 0.0,
-        max_t: float = float('inf'),
+        max_t: float = float("inf"),
     ):
         super(PausePDF, self).__init__(name=name)
         if not os.path.isfile(filepath):
-            raise FileNotFoundError(f'filepath: {filepath} is not a valid file')
+            raise FileNotFoundError(f"filepath: {filepath} is not a valid file")
 
         samples = []
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
                 samples.append(float(line))
-        assert len(samples), f'filepath: {filepath} contains no float samples'
+        assert len(samples), f"filepath: {filepath} contains no float samples"
 
         self._min_t = min_t
         self._max_t = max_t
-        self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel='gaussian')
+        self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel="gaussian")
         self._model.fit(np.asarray(samples).reshape(-1, 1))
 
     def initialise(self):
         t_wait = self._min_t - 1.0
         while not (self._min_t <= t_wait <= self._max_t):
-            t_wait = float(self._model.sample(1)[0][0]) # pyright: ignore
+            t_wait = float(self._model.sample(1)[0][0])  # pyright: ignore
         self._pause_t = t_wait
         self._start_t = time.time()
-        self.logger.debug(f'{self.name} sampled pause {self._pause_t:.3f} sec')
+        self.logger.debug(f"{self.name} sampled pause {self._pause_t:.3f} sec")
 
     def update(self):
         t_elapse = time.time() - self._start_t
@@ -208,10 +212,10 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
         self._pressed = False
 
     def _matches(self, key) -> bool:
-        char = getattr(key, 'char', None)
+        char = getattr(key, "char", None)
         if char is not None and char == self._key:
             return True
-        name = getattr(key, 'name', None)
+        name = getattr(key, "name", None)
         if name is not None and name == self._key:
             return True
         return False
@@ -281,26 +285,43 @@ def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]]
             schedule = load_schedule_file("configs/schedules/example_schedule.yaml")
     """
     if not os.path.isfile(schedule_filepath):
-        raise FileNotFoundError(f'schedule_filepath: {schedule_filepath} is not a valid file')
-    
-    with open(schedule_filepath, 'r') as schedule_file:
+        raise FileNotFoundError(
+            f"schedule_filepath: {schedule_filepath} is not a valid file"
+        )
+
+    with open(schedule_filepath, "r") as schedule_file:
         schedule_raw = yaml.safe_load(schedule_file)
 
     if schedule_raw is None:
-        logging.error(f'Failed to load schedule_file: {schedule_filepath}')
+        logging.error(f"Failed to load schedule_file: {schedule_filepath}")
         return None
 
     schedule = []
     for schedule_element_raw in schedule_raw:
-        start_pause_time = datetime.datetime.strptime(schedule_element_raw['start_pause_time'], '%H:%M:%S').time()
-        stop_pause_time = datetime.datetime.strptime(schedule_element_raw['stop_pause_time'], '%H:%M:%S').time()
-        variance_time = datetime.datetime.strptime(schedule_element_raw['variance'], '%H:%M:%S').time()
-        schedule.append({'start_pause_time': start_pause_time,
-                         'stop_pause_time': stop_pause_time,
-                         'variance_time': variance_time,
-                         'start_plus_variance_time': add_variance_to_datetime_time(start_pause_time, variance_time),
-                         'stop_plus_variance_time': add_variance_to_datetime_time(stop_pause_time, variance_time)})
+        start_pause_time = datetime.datetime.strptime(
+            schedule_element_raw["start_pause_time"], "%H:%M:%S"
+        ).time()
+        stop_pause_time = datetime.datetime.strptime(
+            schedule_element_raw["stop_pause_time"], "%H:%M:%S"
+        ).time()
+        variance_time = datetime.datetime.strptime(
+            schedule_element_raw["variance"], "%H:%M:%S"
+        ).time()
+        schedule.append(
+            {
+                "start_pause_time": start_pause_time,
+                "stop_pause_time": stop_pause_time,
+                "variance_time": variance_time,
+                "start_plus_variance_time": add_variance_to_datetime_time(
+                    start_pause_time, variance_time
+                ),
+                "stop_plus_variance_time": add_variance_to_datetime_time(
+                    stop_pause_time, variance_time
+                ),
+            }
+        )
     return schedule
+
 
 def datetime_time_to_sec(t: datetime.time):
     """Convert a time of day to seconds since midnight.
@@ -313,10 +334,13 @@ def datetime_time_to_sec(t: datetime.time):
     Returns:
         int: Seconds elapsed since midnight.
     """
-    sec = t.hour*HOUR2SEC+t.minute*MIN2SEC+t.second
+    sec = t.hour * HOUR2SEC + t.minute * MIN2SEC + t.second
     return sec
 
-def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time) -> datetime.time:
+
+def add_variance_to_datetime_time(
+    t: datetime.time, variance_time: datetime.time
+) -> datetime.time:
     """Offset a time by a random amount drawn from ``[0, variance_time]``.
 
     The offset is always forward in time — it is drawn from zero to the full
@@ -336,6 +360,7 @@ def add_variance_to_datetime_time(t: datetime.time, variance_time: datetime.time
     time_to_datetime = datetime.datetime.combine(datetime.date.today(), t)
     time_with_variance = (time_to_datetime + variance_timedelta).time()
     return time_with_variance
+
 
 class PauseSchedule(py_trees.behaviour.Behaviour):
     """Pause until the end of the schedule window that is active right now.
@@ -380,6 +405,7 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
             root = py_trees.composites.Sequence(name="Root", memory=True)
             root.add_children([pause, main_behavior])
     """
+
     def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
         self._schedule = schedule
         self._last_schedule_idx = None
@@ -392,10 +418,11 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         now_time = datetime.datetime.now().time()
         matched_idx = None
         for idx, schedule_element in enumerate(self._schedule):
-            start = schedule_element['start_plus_variance_time']
-            stop = schedule_element['stop_plus_variance_time']
-            if (start < stop and start < now_time < stop) or \
-               (start > stop and (now_time > start or now_time < stop)):
+            start = schedule_element["start_plus_variance_time"]
+            stop = schedule_element["stop_plus_variance_time"]
+            if (start < stop and start < now_time < stop) or (
+                start > stop and (now_time > start or now_time < stop)
+            ):
                 matched_idx = idx
                 break
 
@@ -410,23 +437,31 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
 
         self._last_schedule_idx = matched_idx
         schedule_element = self._schedule[matched_idx]
-        stop = schedule_element['stop_plus_variance_time']
-        variance = schedule_element['variance_time']
+        stop = schedule_element["stop_plus_variance_time"]
+        variance = schedule_element["variance_time"]
         if now_time < stop:
-            self._t_wait = datetime_time_to_sec(stop) - \
-                           datetime_time_to_sec(now_time)
+            self._t_wait = datetime_time_to_sec(stop) - datetime_time_to_sec(now_time)
         else:
-            self._t_wait = datetime_time_to_sec(datetime.time(23, 59, 59)) + 1 - \
-                           datetime_time_to_sec(now_time) + \
-                           datetime_time_to_sec(stop)
+            self._t_wait = (
+                datetime_time_to_sec(datetime.time(23, 59, 59))
+                + 1
+                - datetime_time_to_sec(now_time)
+                + datetime_time_to_sec(stop)
+            )
         self._t_start = time.time()
-        logging.info(f'Wait has been scheduled for  {self._t_wait:.3f} sec')
-        schedule_element['start_plus_variance_time'] = \
-            add_variance_to_datetime_time(schedule_element['start_pause_time'], variance)
-        schedule_element['stop_plus_variance_time'] = \
-            add_variance_to_datetime_time(schedule_element['stop_pause_time'], variance)
-        logging.info(f'new start_plus_variance_time: {schedule_element["start_plus_variance_time"]}')
-        logging.info(f'new stop_plus_variance_time: {schedule_element["stop_plus_variance_time"]}')
+        logging.info(f"Wait has been scheduled for  {self._t_wait:.3f} sec")
+        schedule_element["start_plus_variance_time"] = add_variance_to_datetime_time(
+            schedule_element["start_pause_time"], variance
+        )
+        schedule_element["stop_plus_variance_time"] = add_variance_to_datetime_time(
+            schedule_element["stop_pause_time"], variance
+        )
+        logging.info(
+            f"new start_plus_variance_time: {schedule_element['start_plus_variance_time']}"
+        )
+        logging.info(
+            f"new stop_plus_variance_time: {schedule_element['stop_plus_variance_time']}"
+        )
 
     def update(self):
         if self._t_wait is None:

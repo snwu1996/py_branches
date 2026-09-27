@@ -44,6 +44,7 @@ def render(
 
     Keys in *checked* are rendered already ticked.
     """
+
     def box(key: str, label: str) -> str:
         mark = "x" if key in checked else " "
         return f"- [{mark}] {label} <!--k:{key}-->"

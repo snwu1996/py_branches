@@ -26,6 +26,7 @@ Most of the decorators take a ``success_if_skip`` flag, which decides what a
 skipped tick reports to the parent composite — FAILURE reads as "try the next
 child" to a Selector, SUCCESS makes the skip invisible to a Sequence.
 """
+
 from . import alternating
 from . import blackboard
 from . import cooldown

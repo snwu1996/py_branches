@@ -17,6 +17,7 @@ skipped tick reports: FAILURE by default, which a parent Selector reads as
 "try the next child", or SUCCESS, which makes the skip invisible to a parent
 Sequence. Which one you want depends entirely on the composite above it.
 """
+
 import py_trees
 import random
 from typing import List
@@ -24,7 +25,7 @@ from typing import Tuple
 
 
 class ActivateBehavior(py_trees.decorators.Decorator):
-    '''
+    """
     Enables activation of a behavior from an external source as long as it has a handle to
     this decorator.
 
@@ -53,11 +54,15 @@ class ActivateBehavior(py_trees.decorators.Decorator):
 
             gate.activate = False  # child is skipped, gate returns SUCCESS
             gate.activate = True   # child runs normally
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       activate: bool,
-                       success_if_skip:bool=False):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        activate: bool,
+        success_if_skip: bool = False,
+    ):
         super(ActivateBehavior, self).__init__(name=name, child=child)
         self._activate = activate
         self._success_if_skip = success_if_skip
@@ -65,7 +70,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
     @property
     def activate(self):
         return self._activate
-    
+
     @activate.setter
     def activate(self, activate: bool):
         self._activate = activate
@@ -84,13 +89,20 @@ class ActivateBehavior(py_trees.decorators.Decorator):
     def update(self) -> py_trees.common.Status:
         return self.decorated.status
 
+
 class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
-    '''Bookkeeper that advances which ActivateBehavior is enabled.
+    """Bookkeeper that advances which ActivateBehavior is enabled.
 
     Always returns FAILURE so the enclosing Selector falls through to the
     wrapped behaviors after this one has updated the rotation.
-    '''
-    def __init__(self, name: str, activatable_behaviors: List[ActivateBehavior], counts: List[int]):
+    """
+
+    def __init__(
+        self,
+        name: str,
+        activatable_behaviors: List[ActivateBehavior],
+        counts: List[int],
+    ):
         self._counts = counts
         self._current_behavior_idx = 0
         self._current_behavior_num_consecutive_runs = 0
@@ -100,9 +112,14 @@ class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
         super().__init__(name)
 
     def initialise(self) -> None:
-        if self._current_behavior_num_consecutive_runs >= self._counts[self._current_behavior_idx]:
+        if (
+            self._current_behavior_num_consecutive_runs
+            >= self._counts[self._current_behavior_idx]
+        ):
             self._activatable_behaviors[self._current_behavior_idx].activate = False
-            self._current_behavior_idx = (self._current_behavior_idx + 1) % len(self._counts)
+            self._current_behavior_idx = (self._current_behavior_idx + 1) % len(
+                self._counts
+            )
             self._activatable_behaviors[self._current_behavior_idx].activate = True
             self._current_behavior_num_consecutive_runs = 0
 
@@ -111,8 +128,11 @@ class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
     def update(self) -> py_trees.common.Status:
         return py_trees.common.Status.FAILURE
 
-def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], counts: List[int]):
-    '''
+
+def run_alternating(
+    name: str, behaviors: List[py_trees.behaviour.Behaviour], counts: List[int]
+):
+    """
     Build a Selector that cycles through behaviors, each for a fixed run of ticks.
 
     The returned Selector holds a private bookkeeping behavior followed by every
@@ -152,17 +172,23 @@ def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], co
             c = py_trees.behaviours.Success(name="C")
 
             root = run_alternating("Cycle", [a, b, c], [3, 2, 4])
-    '''
+    """
     if 0 in counts:
-        raise ValueError(f'counts({counts}) can not have 0 in the list.')
+        raise ValueError(f"counts({counts}) can not have 0 in the list.")
     if len(counts) != len(behaviors):
-        raise ValueError('len(counts) != len(behaviors), two lists must be of same length.')
+        raise ValueError(
+            "len(counts) != len(behaviors), two lists must be of same length."
+        )
 
     alternating_behaviors = []
     for idx, behavior in enumerate(behaviors):
-        activate_decorator = ActivateBehavior(behavior, f'activate_{behavior.name}', False)
+        activate_decorator = ActivateBehavior(
+            behavior, f"activate_{behavior.name}", False
+        )
         alternating_behaviors.append(activate_decorator)
-    run_alternating_helper = _RunAlternatingHelper(f'{name}_helper', alternating_behaviors, counts)
+    run_alternating_helper = _RunAlternatingHelper(
+        f"{name}_helper", alternating_behaviors, counts
+    )
 
     children = []
     children.append(run_alternating_helper)
@@ -171,8 +197,9 @@ def run_alternating(name: str, behaviors: List[py_trees.behaviour.Behaviour], co
     run_alternating_selector = py_trees.composites.Selector(name, False, children)
     return run_alternating_selector
 
+
 class RunEveryRange(py_trees.decorators.Decorator):
-    '''
+    """
     Run the child only during a window of iterations within a fixed-length cycle.
 
     An internal counter runs from 1 to ``max_range`` and then wraps back to 1.
@@ -213,18 +240,24 @@ class RunEveryRange(py_trees.decorators.Decorator):
 
             # Run on iterations 4, 5 and 6 of every 10-tick cycle.
             windowed = RunEveryRange(child, name="Window", max_range=10, run_range=(4, 6))
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       max_range: int,
-                       run_range: Tuple[int, int],
-                       success_if_skip: bool = False):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        max_range: int,
+        run_range: Tuple[int, int],
+        success_if_skip: bool = False,
+    ):
         if run_range[0] > run_range[1]:
-            raise ValueError('run_range must be a tuple with (smaller_number, bigger_number)')
+            raise ValueError(
+                "run_range must be a tuple with (smaller_number, bigger_number)"
+            )
         if run_range[0] < 1:
-            raise ValueError('Lower run range must be greater or equal to 1')
+            raise ValueError("Lower run range must be greater or equal to 1")
         if run_range[1] > max_range:
-            raise ValueError(f'Upper run range must be lower or equal to {max_range}')
+            raise ValueError(f"Upper run range must be lower or equal to {max_range}")
 
         super(RunEveryRange, self).__init__(name=name, child=child)
         self._max_range = max_range
@@ -251,8 +284,9 @@ class RunEveryRange(py_trees.decorators.Decorator):
     def update(self) -> py_trees.common.Status:
         return self.decorated.status
 
+
 class RunEveryX(py_trees.decorators.Decorator):
-    '''
+    """
     Run the child once every X ticks, where X is re-drawn after each execution.
 
     X is sampled from ``every_x_range`` inclusive. A fixed range like ``(5, 5)``
@@ -302,23 +336,29 @@ class RunEveryX(py_trees.decorators.Decorator):
 
             # Run at a random interval between 1 and 5 ticks.
             varied = RunEveryX(child, name="Varied", every_x_range=(1, 5))
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       every_x_range: Tuple[int, int],
-                       success_if_skip:bool=False):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        every_x_range: Tuple[int, int],
+        success_if_skip: bool = False,
+    ):
         if every_x_range[0] > every_x_range[1]:
-            raise ValueError('every_x_range must be a tuple with (smaller_number, bigger_number)')
+            raise ValueError(
+                "every_x_range must be a tuple with (smaller_number, bigger_number)"
+            )
         if every_x_range[0] < 1:
-            raise ValueError('Can not have range be lower than 1.')
+            raise ValueError("Can not have range be lower than 1.")
 
         super(RunEveryX, self).__init__(name=name, child=child)
         self._every_x_range = every_x_range
-        self._cycles_remaining = random.randint(*self._every_x_range)-1
+        self._cycles_remaining = random.randint(*self._every_x_range) - 1
         self._success_if_skip = success_if_skip
 
     def initialise(self):
-        self._cycles_remaining = random.randint(*self._every_x_range)-1
+        self._cycles_remaining = random.randint(*self._every_x_range) - 1
 
     def tick(self):
         if self._cycles_remaining > 0:

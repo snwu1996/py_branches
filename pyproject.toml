@@ -77,6 +77,16 @@ typeCheckingMode = "basic"
 # PATH, so `poetry run pyright` works against the active venv both locally and
 # in CI, wherever poetry puts it.
 
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = false
+
 [tool.coverage.run]
 source = ["py_branches"]
 # These behaviors are mostly if-ladders over tick status, so statement-only

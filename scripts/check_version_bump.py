@@ -65,17 +65,29 @@ def fail(message: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, type=Path,
-                        help="pyproject.toml as it exists on the base branch")
-    parser.add_argument("--head", required=True, type=Path,
-                        help="pyproject.toml from the pull request head")
+    parser.add_argument(
+        "--base",
+        required=True,
+        type=Path,
+        help="pyproject.toml as it exists on the base branch",
+    )
+    parser.add_argument(
+        "--head",
+        required=True,
+        type=Path,
+        help="pyproject.toml from the pull request head",
+    )
     args = parser.parse_args()
 
     head_project, head_poetry = read_versions(args.head)
     base_project, base_poetry = read_versions(args.base)
 
     # 1. The two declarations in the head file must agree.
-    if head_project is not None and head_poetry is not None and head_project != head_poetry:
+    if (
+        head_project is not None
+        and head_poetry is not None
+        and head_project != head_poetry
+    ):
         fail(
             "pyproject.toml versions disagree: "
             f"[project].version = {head_project!r}, "

@@ -4,11 +4,12 @@
 A single decorator, :class:`Counter`, for one-time or fixed-count sequences
 such as initialization and calibration.
 """
+
 import py_trees
 
 
 class Counter(py_trees.decorators.Decorator):
-    '''
+    """
     Runs a child behavior exactly ``num_runs`` times (total completions), then
     permanently returns ``completion_status`` without ever running the child
     again.
@@ -47,13 +48,17 @@ class Counter(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Success(name="Calibrate")
             # Run calibration exactly 3 times, then always return SUCCESS.
             counted = Counter(child, name="Calibrate3x", num_runs=3)
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       num_runs: int,
-                       completion_status: py_trees.common.Status = py_trees.common.Status.SUCCESS):
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        num_runs: int,
+        completion_status: py_trees.common.Status = py_trees.common.Status.SUCCESS,
+    ):
         if num_runs < 1:
-            raise ValueError(f'num_runs({num_runs}) must be greater than 0.')
+            raise ValueError(f"num_runs({num_runs}) must be greater than 0.")
         super(Counter, self).__init__(name=name, child=child)
         self._num_runs = num_runs
         self._completion_status = completion_status
@@ -61,7 +66,7 @@ class Counter(py_trees.decorators.Decorator):
         self._done = False
 
     def reset(self) -> None:
-        '''Reset the run count so the child will be run num_runs times again.'''
+        """Reset the run count so the child will be run num_runs times again."""
         self._runs_completed = 0
         self._done = False
 

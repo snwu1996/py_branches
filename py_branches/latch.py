@@ -4,11 +4,12 @@
 A single decorator, :class:`Latch`, for work that should happen once and then
 report success forever after.
 """
+
 import py_trees
 
 
 class Latch(py_trees.decorators.Decorator):
-    '''
+    """
     Once the child returns SUCCESS, latches to SUCCESS and stops re-running
     the child until :meth:`reset` is called.
 
@@ -38,14 +39,14 @@ class Latch(py_trees.decorators.Decorator):
 
             # Later, to trigger a re-run:
             latched.reset()
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str):
+    """
+
+    def __init__(self, child: py_trees.behaviour.Behaviour, name: str):
         super(Latch, self).__init__(name=name, child=child)
         self._latched = False
 
     def reset(self) -> None:
-        '''Disengage the latch so the child will run again on the next tick.'''
+        """Disengage the latch so the child will run again on the next tick."""
         self._latched = False
 
     def tick(self):

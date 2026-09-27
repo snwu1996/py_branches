@@ -12,7 +12,8 @@ _i = py_trees.common.Status.INVALID
 
 
 class TrackingBehavior(py_trees.behaviour.Behaviour):
-    '''Returns a fixed status and tracks how many times it has been ticked.'''
+    """Returns a fixed status and tracks how many times it has been ticked."""
+
     def __init__(self, name, return_status):
         super().__init__(name=name)
         self._return_status = return_status
@@ -24,9 +25,9 @@ class TrackingBehavior(py_trees.behaviour.Behaviour):
 
 
 def test_counter_run_once():
-    '''num_runs=1: child runs once, then permanently SUCCESS.'''
-    child = TrackingBehavior('child', _s)
-    counter = Counter(child, name='counter', num_runs=1)
+    """num_runs=1: child runs once, then permanently SUCCESS."""
+    child = TrackingBehavior("child", _s)
+    counter = Counter(child, name="counter", num_runs=1)
 
     counter.tick_once()
     assert counter.status == _s
@@ -41,9 +42,9 @@ def test_counter_run_once():
 
 
 def test_counter_run_three_times():
-    '''Child runs exactly 3 times, then returns SUCCESS permanently.'''
-    child = TrackingBehavior('child', _s)
-    counter = Counter(child, name='counter', num_runs=3)
+    """Child runs exactly 3 times, then returns SUCCESS permanently."""
+    child = TrackingBehavior("child", _s)
+    counter = Counter(child, name="counter", num_runs=3)
 
     # Run 1 and 2: RUNNING (more runs remain)
     counter.tick_once()
@@ -67,10 +68,14 @@ def test_counter_run_three_times():
 
 
 def test_counter_completion_status_failure():
-    '''completion_status=FAILURE: permanently returns FAILURE after num_runs.'''
-    child = TrackingBehavior('child', _s)
-    counter = Counter(child, name='counter', num_runs=2,
-                      completion_status=py_trees.common.Status.FAILURE)
+    """completion_status=FAILURE: permanently returns FAILURE after num_runs."""
+    child = TrackingBehavior("child", _s)
+    counter = Counter(
+        child,
+        name="counter",
+        num_runs=2,
+        completion_status=py_trees.common.Status.FAILURE,
+    )
 
     counter.tick_once()
     assert counter.status == _r  # first run, more remain
@@ -84,9 +89,9 @@ def test_counter_completion_status_failure():
 
 
 def test_counter_counts_failure_completions():
-    '''Child FAILURE also counts toward num_runs.'''
-    child = TrackingBehavior('child', _f)
-    counter = Counter(child, name='counter', num_runs=2)
+    """Child FAILURE also counts toward num_runs."""
+    child = TrackingBehavior("child", _f)
+    counter = Counter(child, name="counter", num_runs=2)
 
     counter.tick_once()
     assert counter.status == _r  # failure counted, 1 more run left
@@ -96,10 +101,11 @@ def test_counter_counts_failure_completions():
 
 
 def test_counter_running_child_not_counted():
-    '''RUNNING ticks do not count toward num_runs.'''
+    """RUNNING ticks do not count toward num_runs."""
+
     class RunThenSucceed(py_trees.behaviour.Behaviour):
         def __init__(self):
-            super().__init__(name='run_then_succeed')
+            super().__init__(name="run_then_succeed")
             self._ticks = 0
 
         def initialise(self):
@@ -110,7 +116,7 @@ def test_counter_running_child_not_counted():
             return _r if self._ticks < 3 else _s
 
     child = RunThenSucceed()
-    counter = Counter(child, name='counter', num_runs=2)
+    counter = Counter(child, name="counter", num_runs=2)
 
     # Ticks 1-2: child is RUNNING — not counted
     counter.tick_once()
@@ -123,7 +129,7 @@ def test_counter_running_child_not_counted():
 
     # Tick 3: child completes (SUCCESS) — run 1 counted, child reset
     counter.tick_once()
-    assert counter.status == _r   # 1 run done, 1 more to go
+    assert counter.status == _r  # 1 run done, 1 more to go
     assert counter._runs_completed == 1
 
     # Ticks 4-5: child RUNNING again (re-initialised after reset)
@@ -142,9 +148,9 @@ def test_counter_running_child_not_counted():
 
 
 def test_counter_reset_allows_recount():
-    '''reset() clears the count so the child runs num_runs times again.'''
-    child = TrackingBehavior('child', _s)
-    counter = Counter(child, name='counter', num_runs=2)
+    """reset() clears the count so the child runs num_runs times again."""
+    child = TrackingBehavior("child", _s)
+    counter = Counter(child, name="counter", num_runs=2)
 
     counter.tick_once()  # run 1
     counter.tick_once()  # run 2; done
@@ -165,9 +171,9 @@ def test_counter_reset_allows_recount():
 
 
 def test_counter_done_persists_across_reentry():
-    '''_done is not cleared by initialise(); it persists until reset().'''
-    child = TrackingBehavior('child', _s)
-    counter = Counter(child, name='counter', num_runs=1)
+    """_done is not cleared by initialise(); it persists until reset()."""
+    child = TrackingBehavior("child", _s)
+    counter = Counter(child, name="counter", num_runs=1)
 
     counter.tick_once()
     assert counter._done

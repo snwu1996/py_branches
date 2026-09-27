@@ -19,10 +19,10 @@ from sphinx.util import logging as sphinx_logging
 logger = sphinx_logging.getLogger(__name__)
 
 #: Relative to the Sphinx source directory.
-OUTPUT_SUBDIR = os.path.join('_static', 'trees')
+OUTPUT_SUBDIR = os.path.join("_static", "trees")
 
 #: render_dot_tree writes one file per format; only the SVG is referenced.
-UNUSED_FORMATS = ('.dot', '.png')
+UNUSED_FORMATS = (".dot", ".png")
 
 
 def _render_one(diagram, target_directory):
@@ -32,9 +32,7 @@ def _render_one(diagram, target_directory):
     try:
         root = diagram.factory()
     except Exception as exc:  # noqa: BLE001 - a bad factory must not abort the build
-        logger.warning(
-            'render_trees: building tree %r failed: %s', diagram.name, exc
-        )
+        logger.warning("render_trees: building tree %r failed: %s", diagram.name, exc)
         return False
 
     try:
@@ -47,14 +45,14 @@ def _render_one(diagram, target_directory):
     except TypeError as exc:
         # A py_trees release that changed render_dot_tree's signature.
         logger.warning(
-            'render_trees: render_dot_tree rejected our arguments (%s); '
-            'the installed py_trees may be incompatible with this extension',
+            "render_trees: render_dot_tree rejected our arguments (%s); "
+            "the installed py_trees may be incompatible with this extension",
             exc,
         )
         return False
     except Exception as exc:  # noqa: BLE001 - most likely a missing dot binary
         logger.warning(
-            'render_trees: rendering %r failed: %s. Is graphviz installed?',
+            "render_trees: rendering %r failed: %s. Is graphviz installed?",
             diagram.name,
             exc,
         )
@@ -73,7 +71,7 @@ def render_trees(app):
     try:
         import tree_examples
     except ImportError as exc:
-        logger.warning('render_trees: could not import tree_examples: %s', exc)
+        logger.warning("render_trees: could not import tree_examples: %s", exc)
         return
 
     target_directory = os.path.join(app.srcdir, OUTPUT_SUBDIR)
@@ -83,7 +81,7 @@ def render_trees(app):
         _render_one(diagram, target_directory) for diagram in tree_examples.DIAGRAMS
     )
     logger.info(
-        'render_trees: wrote %d of %d diagrams to %s',
+        "render_trees: wrote %d of %d diagrams to %s",
         rendered,
         len(tree_examples.DIAGRAMS),
         OUTPUT_SUBDIR,
@@ -91,9 +89,9 @@ def render_trees(app):
 
 
 def setup(app):
-    app.connect('builder-inited', render_trees)
+    app.connect("builder-inited", render_trees)
     return {
-        'version': '1.0',
-        'parallel_read_safe': True,
-        'parallel_write_safe': True,
+        "version": "1.0",
+        "parallel_read_safe": True,
+        "parallel_write_safe": True,
     }

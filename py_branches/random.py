@@ -32,7 +32,7 @@ from typing import List
 
 
 class RandomRun(py_trees.decorators.Decorator):
-    '''
+    """
     Random chance of running the child of this decorator.
 
     A single draw decides whether the child runs for a whole execution. The
@@ -67,13 +67,18 @@ class RandomRun(py_trees.decorators.Decorator):
             sometimes = RandomRun(
                 child, name="Sometimes", probability=0.3, success_if_skip=True
             )
-    '''
+    """
+
     def __init__(self, child, name, probability: float, success_if_skip: bool = False):
         if not (0 <= probability <= 1.0):
-            raise ValueError(f'Probability == {probability} but needs to be in range [0, 1.0]')
+            raise ValueError(
+                f"Probability == {probability} but needs to be in range [0, 1.0]"
+            )
         super(RandomRun, self).__init__(name=name, child=child)
         self._probability = probability
-        self._run = None  # rolled on first tick; terminate() handles all subsequent rolls
+        self._run = (
+            None  # rolled on first tick; terminate() handles all subsequent rolls
+        )
         self._success_if_skip = success_if_skip
 
     def tick(self):
@@ -98,8 +103,9 @@ class RandomRun(py_trees.decorators.Decorator):
     def terminate(self, new_status: py_trees.common.Status) -> None:
         self._run = random.random() <= self._probability
 
+
 class RandomDelay(py_trees.decorators.Decorator):
-    '''
+    """
     Waits a random duration before running the child on each fresh entry.
 
     On every fresh entry (i.e. when the decorator was not already RUNNING),
@@ -126,15 +132,15 @@ class RandomDelay(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Success(name="Action")
             # Pause 0.5-2.0 seconds before running the child each time.
             delayed = RandomDelay(child, name="RandomDelay", low=0.5, high=2.0)
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       low: float,
-                       high: float):
+    """
+
+    def __init__(
+        self, child: py_trees.behaviour.Behaviour, name: str, low: float, high: float
+    ):
         if low < 0.0:
-            raise ValueError(f'low({low}) must be >= 0.')
+            raise ValueError(f"low({low}) must be >= 0.")
         if low > high:
-            raise ValueError(f'low({low}) must be <= high({high}).')
+            raise ValueError(f"low({low}) must be <= high({high}).")
         super(RandomDelay, self).__init__(name=name, child=child)
         self._low = low
         self._high = high
@@ -163,7 +169,9 @@ class RandomDelay(py_trees.decorators.Decorator):
         return self.decorated.status
 
 
-def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabilities: List[float]):
+def random_selector(
+    name, behaviors: List[py_trees.behaviour.Behaviour], probabilities: List[float]
+):
     """Build a Selector that picks one child according to absolute weights.
 
     A plain py_trees Selector tries its children left to right and stops at the
@@ -208,29 +216,35 @@ def random_selector(name, behaviors: List[py_trees.behaviour.Behaviour], probabi
             selector = random_selector("WeightedChoice", [a, b, c], [0.2, 0.3, 0.5])
     """
     if abs(sum(probabilities) - 1.0) >= 1e-9:
-        raise ValueError(f'sum(probabilities) must add up to 1.0, got {sum(probabilities)}')
+        raise ValueError(
+            f"sum(probabilities) must add up to 1.0, got {sum(probabilities)}"
+        )
     if len(probabilities) != len(behaviors):
-        raise ValueError('len(probabilities) != len(behaviors), two lists must be of same length.')
+        raise ValueError(
+            "len(probabilities) != len(behaviors), two lists must be of same length."
+        )
 
     children = []
     new_probabilities = []
     cumulative_prob = 0.0
     for behavior, raw_prob in zip(behaviors, probabilities):
-        new_prob = raw_prob/(1.0-cumulative_prob)
+        new_prob = raw_prob / (1.0 - cumulative_prob)
         if new_prob >= 1.0:
             children.append(behavior)
             break
 
         new_probabilities.append(new_prob)
-        decorated_behavior_name = f'random_run_{behavior.name}'
-        decorated_behavior = RandomRun(name=decorated_behavior_name,
-                                       child=behavior,
-                                       probability=new_prob)
+        decorated_behavior_name = f"random_run_{behavior.name}"
+        decorated_behavior = RandomRun(
+            name=decorated_behavior_name, child=behavior, probability=new_prob
+        )
         children.append(decorated_behavior)
 
         cumulative_prob += raw_prob
 
-    logging.debug(f'behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}')
+    logging.debug(
+        f"behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}"
+    )
 
     selector = py_trees.composites.Selector(name, True, children)
     return selector
