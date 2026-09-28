@@ -186,7 +186,8 @@ jobs:
         run: ruff check --output-format=github .
 
   version:
-    # Release PRs must bump the version; label a PR 'no-version-bump' to skip.
+    # Release PRs must bump the version. CI-only PRs are exempt (see the
+    # detection step below); label a PR 'no-version-bump' to skip otherwise.
     if: >-
       github.event_name == 'pull_request' &&
       !contains(github.event.pull_request.labels.*.name, 'no-version-bump')
@@ -195,20 +196,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Need base branch history to read its pyproject.toml.
+          # Need base branch history to read its pyproject.toml, and to diff
+          # against it below.
           fetch-depth: 0
 
+      - name: Detect whether anything shippable changed
+        id: changed
+        # A PR that only touches CI config cannot change what a user installs,
+        # so requiring a release for it just burns version numbers. Anything
+        # outside .github/ -- source, docs, tests, scripts, packaging -- still
+        # requires a bump, and the 'no-version-bump' label remains the escape
+        # hatch for the cases this rule does not cover.
+        run: |
+          files="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          echo "changed files:"
+          echo "$files"
+          # Tests grep's output rather than its exit status: the two disagree
+          # across grep implementations when -v and -q are combined.
+          shipping=true
+          if [ -n "$files" ] && [ -z "$(echo "$files" | grep -v '^\.github/')" ]; then
+            shipping=false
+            echo "CI-only change; skipping the version check."
+          fi
+          echo "shipping=$shipping" >> "$GITHUB_OUTPUT"
+
       - name: Set up Python
+        if: steps.changed.outputs.shipping == 'true'
         uses: actions/setup-python@v5
         with:
           # 3.11+ for stdlib tomllib; the check needs no third-party packages.
           python-version: "3.12"
 
       - name: Extract base branch pyproject.toml
+        if: steps.changed.outputs.shipping == 'true'
         run: |
           git show "origin/${{ github.base_ref }}:pyproject.toml" > "$RUNNER_TEMP/base-pyproject.toml"
 
       - name: Check version was bumped
+        if: steps.changed.outputs.shipping == 'true'
         run: |
           python scripts/check_version_bump.py \
             --base "$RUNNER_TEMP/base-pyproject.toml" \
