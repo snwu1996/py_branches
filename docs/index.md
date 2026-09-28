@@ -26,6 +26,7 @@ pip install -e .
 |---|---|
 | {doc}`alternating` | Cycle through behaviors in fixed patterns, or run a child every N ticks |
 | {doc}`blackboard` | Read, write, and gate execution on py_trees blackboard variables |
+| {doc}`clock` | Injectable time sources, so timed behaviors are testable |
 | {doc}`cooldown` | Enforce a minimum time gap between runs of a child |
 | {doc}`counter` | Cap the total number of times a child runs |
 | {doc}`latch` | Make a child's first SUCCESS permanent |
@@ -50,6 +51,10 @@ handles the case where the answer is "take another go".
 **How do I see what happened?** {doc}`visitors` — attached to the tree rather
 than placed in it, so they observe without altering control flow.
 
+**How do I test it?** {doc}`clock` — every behavior that measures elapsed time
+takes a keyword-only `clock`, so a test can step time forward instead of
+sleeping through it.
+
 {doc}`pause`, uniquely, is the tree deliberately doing nothing for a while.
 
 ## A note on `success_if_skip`
@@ -71,6 +76,7 @@ The defaults are not uniform — the gates in {doc}`blackboard` default to
 
 alternating
 blackboard
+clock
 cooldown
 counter
 latch

@@ -26,9 +26,11 @@ pattern that sometimes skips a step:
 
 import logging
 import random
-import time
 
 import py_trees
+
+from .clock import Clock
+from .clock import default_clock
 
 
 class RandomRun(py_trees.decorators.Decorator):
@@ -120,6 +122,9 @@ class RandomDelay(py_trees.decorators.Decorator):
         name (str): Name of this decorator.
         low (float): Minimum delay in seconds (>= 0).
         high (float): Maximum delay in seconds (>= low).
+        clock (Clock): Time source for the delay, keyword-only. Defaults to the
+            real clock; pass a :class:`py_branches.clock.ManualClock` to
+            control it in tests.
 
     Raises:
         ValueError: If ``low`` is negative, or greater than ``high``.
@@ -133,7 +138,13 @@ class RandomDelay(py_trees.decorators.Decorator):
     """
 
     def __init__(
-        self, child: py_trees.behaviour.Behaviour, name: str, low: float, high: float
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        low: float,
+        high: float,
+        *,
+        clock: Clock | None = None,
     ):
         if low < 0.0:
             raise ValueError(f"low({low}) must be >= 0.")
@@ -142,6 +153,7 @@ class RandomDelay(py_trees.decorators.Decorator):
         super().__init__(name=name, child=child)
         self._low = low
         self._high = high
+        self._clock = clock if clock is not None else default_clock()
         self._delay = 0.0
         self._start_time: float | None = None
         self._waiting = False
@@ -150,11 +162,11 @@ class RandomDelay(py_trees.decorators.Decorator):
         # Fresh entry: sample a new delay and start the timer.
         if self.status != py_trees.common.Status.RUNNING:
             self._delay = random.uniform(self._low, self._high)
-            self._start_time = time.time()
+            self._start_time = self._clock.time()
             self._waiting = True
 
         if self._waiting and self._start_time is not None:
-            if time.time() - self._start_time < self._delay:
+            if self._clock.time() - self._start_time < self._delay:
                 self.status = py_trees.common.Status.RUNNING
                 yield self
                 return

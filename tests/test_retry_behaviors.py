@@ -4,6 +4,7 @@ import time
 
 import py_trees
 
+from py_branches.clock import ManualClock
 from py_branches.retry import Retry
 
 _r = py_trees.common.Status.RUNNING
@@ -138,3 +139,47 @@ def test_retry_running_child_passes_through():
         retry.tick_once()
         assert retry.status == _r
         assert retry._attempts == 0
+
+
+def test_retry_waits_exactly_delay_between_attempts_on_manual_clock():
+    """The child is not re-ticked until the delay has elapsed."""
+    child = py_trees.behaviours.Failure(name="failure")
+    clock = ManualClock()
+    retry = Retry(child, name="retry", max_attempts=2, delay=1.0, clock=clock)
+
+    # First attempt fails; the decorator waits rather than retrying at once.
+    retry.tick_once()
+    assert retry.status == _r
+    assert retry._waiting
+    assert retry._attempts == 1
+
+    # Part-way through the delay: still waiting, no further attempt spent.
+    clock.advance(0.999)
+    retry.tick_once()
+    assert retry.status == _r
+    assert retry._attempts == 1
+
+    # Delay elapsed: the second (and final) attempt runs and exhausts the budget.
+    clock.advance(0.001)
+    retry.tick_once()
+    assert retry.status == _f
+    assert retry._attempts == 2
+
+
+def test_retry_zero_delay_does_not_wait_on_manual_clock():
+    """delay=0.0 keeps the old behaviour: attempts back-to-back, no timer."""
+    child = py_trees.behaviours.Failure(name="failure")
+    clock = ManualClock()
+    retry = Retry(child, name="retry", max_attempts=3, delay=0.0, clock=clock)
+
+    retry.tick_once()
+    assert retry.status == _r
+    assert not retry._waiting
+
+    retry.tick_once()
+    assert retry.status == _r
+
+    # Three attempts spent across three ticks, with no clock movement at all.
+    retry.tick_once()
+    assert retry.status == _f
+    assert clock.time() == 0.0

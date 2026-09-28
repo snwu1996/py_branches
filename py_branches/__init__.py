@@ -12,6 +12,7 @@ Module                         What it covers
                                N ticks
 :mod:`py_branches.blackboard`  Reading, writing and gating on blackboard
                                variables
+:mod:`py_branches.clock`       Injectable time sources, for testable timing
 :mod:`py_branches.cooldown`    Enforcing a minimum gap between runs
 :mod:`py_branches.counter`     Capping the total number of runs
 :mod:`py_branches.latch`       Making a first SUCCESS permanent
@@ -25,10 +26,15 @@ Module                         What it covers
 Most of the decorators take a ``success_if_skip`` flag, which decides what a
 skipped tick reports to the parent composite — FAILURE reads as "try the next
 child" to a Selector, SUCCESS makes the skip invisible to a Sequence.
+
+Every behavior that measures elapsed time takes a keyword-only ``clock``, so
+timing can be driven by a test instead of the wall clock — see
+:mod:`py_branches.clock`.
 """
 
 from . import alternating
 from . import blackboard
+from . import clock
 from . import cooldown
 from . import counter
 from . import latch
@@ -44,6 +50,7 @@ from . import visitors
 __all__ = [
     "alternating",
     "blackboard",
+    "clock",
     "cooldown",
     "counter",
     "latch",

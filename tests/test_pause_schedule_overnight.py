@@ -4,54 +4,31 @@
 A window whose start is later than its stop wraps past midnight, which takes
 a different branch both when matching the window and when computing the wait.
 The real clock cannot exercise those branches reliably -- an overnight test
-built on datetime.now() would behave differently depending on the hour CI runs
-at, and the 'now is after start' case computes a wait of up to ~24 hours. So
-these tests freeze the clock inside py_branches.pause instead.
+built on the real time of day would behave differently depending on the hour CI
+runs at, and the 'now is after start' case computes a wait of up to ~24 hours.
+So these tests hand PauseSchedule a ManualClock pinned to the hour under test.
 """
 
 import datetime
-import time
 
 import py_trees
 import pytest
 
-import py_branches.pause as pause
+from py_branches.clock import ManualClock
 from py_branches.pause import PauseSchedule
 
 
-def _frozen_datetime_class(now_dt):
-    class _FrozenDatetime(datetime.datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return now_dt
-
-    return _FrozenDatetime
-
-
-class _FakeDatetimeModule:
-    """Stand-in for the `datetime` module with `datetime.now()` pinned.
-
-    Patched onto py_branches.pause only, so the real module is untouched
-    everywhere else.
-    """
-
-    def __init__(self, now_dt):
-        self.datetime = _frozen_datetime_class(now_dt)
-        self.date = datetime.date
-        self.time = datetime.time
-        self.timedelta = datetime.timedelta
-
-
 @pytest.fixture
-def freeze_now(monkeypatch):
-    def _freeze(hour, minute, second):
+def clock_at():
+    """Return a factory for a ManualClock pinned to a local time of day."""
+
+    def _at(hour, minute, second):
         now_dt = datetime.datetime.combine(
             datetime.date.today(), datetime.time(hour, minute, second)
         )
-        monkeypatch.setattr(pause, "datetime", _FakeDatetimeModule(now_dt))
-        return now_dt
+        return ManualClock(start=now_dt.timestamp())
 
-    return _freeze
+    return _at
 
 
 def _schedule(start, stop):
@@ -67,10 +44,10 @@ def _schedule(start, stop):
     ]
 
 
-def test_overnight_window_matches_before_midnight(freeze_now):
-    freeze_now(23, 30, 0)
+def test_overnight_window_matches_before_midnight(clock_at):
+    clock = clock_at(23, 30, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
@@ -79,10 +56,10 @@ def test_overnight_window_matches_before_midnight(freeze_now):
     assert pause_schedule._t_wait == 1.5 * 60 * 60
 
 
-def test_overnight_window_matches_after_midnight(freeze_now):
-    freeze_now(0, 30, 0)
+def test_overnight_window_matches_after_midnight(clock_at):
+    clock = clock_at(0, 30, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
@@ -91,10 +68,10 @@ def test_overnight_window_matches_after_midnight(freeze_now):
     assert pause_schedule._t_wait == 30 * 60
 
 
-def test_overnight_window_wait_spans_midnight_exactly(freeze_now):
-    freeze_now(23, 59, 59)
+def test_overnight_window_wait_spans_midnight_exactly(clock_at):
+    clock = clock_at(23, 59, 59)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(0, 0, 1))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
@@ -104,10 +81,10 @@ def test_overnight_window_wait_spans_midnight_exactly(freeze_now):
     assert pause_schedule._t_wait == 2
 
 
-def test_overnight_window_does_not_match_midday(freeze_now):
-    freeze_now(12, 0, 0)
+def test_overnight_window_does_not_match_midday(clock_at):
+    clock = clock_at(12, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
@@ -116,32 +93,32 @@ def test_overnight_window_does_not_match_midday(freeze_now):
     assert pause_schedule._t_wait is None
 
 
-def test_overnight_window_boundaries_are_exclusive(freeze_now):
+def test_overnight_window_boundaries_are_exclusive(clock_at):
     # Exactly on start: the match uses `now > start`, so this is outside.
-    freeze_now(23, 0, 0)
+    clock = clock_at(23, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
 
-def test_overnight_window_stop_boundary_is_exclusive(freeze_now):
+def test_overnight_window_stop_boundary_is_exclusive(clock_at):
     # Exactly on stop: `now < stop` is false and `now > start` is false.
-    freeze_now(1, 0, 0)
+    clock = clock_at(1, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
 
-def test_same_day_window_wait_does_not_roll_over(freeze_now):
-    freeze_now(12, 0, 0)
+def test_same_day_window_wait_does_not_roll_over(clock_at):
+    clock = clock_at(12, 0, 0)
     schedule = _schedule(datetime.time(11, 0, 0), datetime.time(13, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 
@@ -150,27 +127,45 @@ def test_same_day_window_wait_does_not_roll_over(freeze_now):
     assert pause_schedule._t_wait == 60 * 60
 
 
-def test_overnight_window_completes_after_wait_elapses(freeze_now):
-    # A two-second wait that straddles midnight, short enough to wait out.
-    freeze_now(23, 59, 59)
+def test_overnight_window_completes_after_wait_elapses(clock_at):
+    # A two-second wait that straddles midnight, waited out on the manual clock.
+    clock = clock_at(23, 59, 59)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(0, 0, 1))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.RUNNING
 
-    # Still RUNNING is driven by the real clock, so the frozen 'now' does not
-    # interfere; the behaviour stays RUNNING until _t_wait seconds pass.
-    time.sleep(2.2)
+    # The countdown is measured in elapsed clock time, so advancing past
+    # _t_wait ends the pause -- instantly, and without a real 2.2s sleep.
+    clock.advance(2.2)
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
 
-def test_overnight_window_selects_matching_entry_among_several(freeze_now):
-    freeze_now(23, 30, 0)
+def test_overnight_window_stays_running_until_wait_elapses(clock_at):
+    # The other side of the boundary: one tick short of _t_wait is still RUNNING.
+    clock = clock_at(23, 59, 59)
+    schedule = _schedule(datetime.time(23, 0, 0), datetime.time(0, 0, 1))
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
+
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
+
+    clock.advance(1.999)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
+
+    clock.advance(0.001)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.SUCCESS
+
+
+def test_overnight_window_selects_matching_entry_among_several(clock_at):
+    clock = clock_at(23, 30, 0)
     schedule = _schedule(datetime.time(2, 0, 0), datetime.time(3, 0, 0))
     schedule += _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     pause_schedule.tick_once()
 

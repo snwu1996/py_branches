@@ -155,6 +155,9 @@ from py_branches.blackboard import RunIfBlackboardVariableEquals
 from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
 from py_branches.blackboard import RunIfBlackboardVariableLessThan
 from py_branches.blackboard import SetBlackboardVariableIfCondition
+from py_branches.clock import ManualClock
+from py_branches.clock import SystemClock
+from py_branches.clock import default_clock
 from py_branches.cooldown import Cooldown
 from py_branches.counter import Counter
 from py_branches.latch import Latch

@@ -13,6 +13,10 @@ Four leaf behaviors, differing in where the pause duration comes from:
 All of them return RUNNING while the pause is active and SUCCESS once it is
 over, so they tick cooperatively rather than blocking the tree.
 
+The three timed pauses take a keyword-only ``clock`` — see
+:mod:`py_branches.clock` — which is what makes their timing testable without
+sleeping.
+
 :func:`load_schedule_file` turns a YAML schedule into the form
 :class:`PauseSchedule` expects; :func:`datetime_time_to_sec` and
 :func:`add_variance_to_datetime_time` are the time helpers behind it.
@@ -22,15 +26,32 @@ import datetime
 import logging
 import os
 import random
-import time
 
 import numpy as np
 import py_trees
 import yaml
 from sklearn.neighbors import KernelDensity
 
+from .clock import Clock
+from .clock import default_clock
+
 HOUR2SEC = 3600
 MIN2SEC = 60
+
+
+def _time_of_day(clock: Clock) -> datetime.time:
+    """Return the local time of day according to ``clock``.
+
+    ``clock.time()`` is a Unix timestamp, so this is the clock-injected
+    equivalent of ``datetime.datetime.now().time()``.
+
+    Args:
+        clock (Clock): Time source to read.
+
+    Returns:
+        datetime.time: Local time of day.
+    """
+    return datetime.datetime.fromtimestamp(clock.time()).time()
 
 
 def _create_keyboard_listener(on_press):
@@ -53,6 +74,9 @@ class PauseUniform(py_trees.behaviour.Behaviour):
         name (str): Name of this behavior node.
         low (float): Minimum pause duration in seconds.
         high (float): Maximum pause duration in seconds.
+        clock (Clock): Time source for the pause, keyword-only. Defaults to the
+            real clock; pass a :class:`py_branches.clock.ManualClock` to
+            control it in tests.
 
     Returns:
         Status: RUNNING until the sampled duration elapses, then SUCCESS.
@@ -64,17 +88,20 @@ class PauseUniform(py_trees.behaviour.Behaviour):
             pause = PauseUniform(name="ShortPause", low=2.0, high=5.0)
     """
 
-    def __init__(self, name: str, low: float, high: float):
+    def __init__(
+        self, name: str, low: float, high: float, *, clock: Clock | None = None
+    ):
         super().__init__(name=name)
         self._high = high
         self._low = low
+        self._clock = clock if clock is not None else default_clock()
 
     def initialise(self):
         self._pause_t = random.uniform(self._low, self._high)
-        self._start_t = time.time()
+        self._start_t = self._clock.time()
 
     def update(self):
-        t_elapse = time.time() - self._start_t
+        t_elapse = self._clock.time() - self._start_t
         if t_elapse < self._pause_t:
             return py_trees.common.Status.RUNNING
         else:
@@ -108,6 +135,9 @@ class PausePDF(py_trees.behaviour.Behaviour):
             Default 0.0.
         max_t (float): Upper bound on the sampled pause, in seconds. Default
             unbounded.
+        clock (Clock): Time source for the pause, keyword-only. Defaults to the
+            real clock; pass a :class:`py_branches.clock.ManualClock` to
+            control it in tests.
 
     Returns:
         Status: RUNNING until the sampled duration elapses, then SUCCESS.
@@ -136,6 +166,8 @@ class PausePDF(py_trees.behaviour.Behaviour):
         kernel_bandwidth: float = 1.0,
         min_t: float = 0.0,
         max_t: float = float("inf"),
+        *,
+        clock: Clock | None = None,
     ):
         super().__init__(name=name)
         if not os.path.isfile(filepath):
@@ -152,6 +184,7 @@ class PausePDF(py_trees.behaviour.Behaviour):
 
         self._min_t = min_t
         self._max_t = max_t
+        self._clock = clock if clock is not None else default_clock()
         self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel="gaussian")
         self._model.fit(np.asarray(samples).reshape(-1, 1))
 
@@ -160,11 +193,11 @@ class PausePDF(py_trees.behaviour.Behaviour):
         while not (self._min_t <= t_wait <= self._max_t):
             t_wait = float(self._model.sample(1)[0][0])  # pyright: ignore
         self._pause_t = t_wait
-        self._start_t = time.time()
+        self._start_t = self._clock.time()
         self.logger.debug(f"{self.name} sampled pause {self._pause_t:.3f} sec")
 
     def update(self):
-        t_elapse = time.time() - self._start_t
+        t_elapse = self._clock.time() - self._start_t
         if t_elapse < self._pause_t:
             return py_trees.common.Status.RUNNING
         return py_trees.common.Status.SUCCESS
@@ -383,6 +416,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         name (str): Name of this behavior node.
         schedule (List[Dict[str, datetime.time]]): Preprocessed schedule, as
             returned by :func:`load_schedule_file`.
+        clock (Clock): Time source, keyword-only. Both the time of day used to
+            match a window and the remaining-time countdown are read from it,
+            so a :class:`py_branches.clock.ManualClock` started at a chosen
+            timestamp puts a test at any hour without touching the real clock.
 
     Returns:
         Status: SUCCESS when outside all windows or once the active window's
@@ -403,16 +440,23 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
             root.add_children([pause, main_behavior])
     """
 
-    def __init__(self, name: str, schedule: list[dict[str, datetime.time]]):
+    def __init__(
+        self,
+        name: str,
+        schedule: list[dict[str, datetime.time]],
+        *,
+        clock: Clock | None = None,
+    ):
         self._schedule = schedule
+        self._clock = clock if clock is not None else default_clock()
         self._last_schedule_idx = None
         super().__init__(name=name)
 
     def initialise(self):
         super().initialise()
         self._t_wait = None
-        self._t_start = time.time()
-        now_time = datetime.datetime.now().time()
+        self._t_start = self._clock.time()
+        now_time = _time_of_day(self._clock)
         matched_idx = None
         for idx, schedule_element in enumerate(self._schedule):
             start = schedule_element["start_plus_variance_time"]
@@ -445,7 +489,7 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
                 - datetime_time_to_sec(now_time)
                 + datetime_time_to_sec(stop)
             )
-        self._t_start = time.time()
+        self._t_start = self._clock.time()
         logging.info(f"Wait has been scheduled for  {self._t_wait:.3f} sec")
         schedule_element["start_plus_variance_time"] = add_variance_to_datetime_time(
             schedule_element["start_pause_time"], variance
@@ -464,7 +508,7 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         if self._t_wait is None:
             return py_trees.common.Status.SUCCESS
 
-        t_elapse = time.time() - self._t_start
+        t_elapse = self._clock.time() - self._t_start
         if t_elapse < self._t_wait:
             return py_trees.common.Status.RUNNING
         else:

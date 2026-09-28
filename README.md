@@ -29,6 +29,7 @@ pip install -e .
 |---|---|
 | [`alternating`](https://py-branches.readthedocs.io/en/latest/alternating.html) | Cycle through behaviors in fixed patterns, or run a child every N ticks |
 | [`blackboard`](https://py-branches.readthedocs.io/en/latest/blackboard.html) | Read, write, and gate execution on py_trees blackboard variables |
+| [`clock`](https://py-branches.readthedocs.io/en/latest/clock.html) | Injectable time sources, so timed behaviors are testable |
 | [`cooldown`](https://py-branches.readthedocs.io/en/latest/cooldown.html) | Enforce a minimum time gap between runs of a child |
 | [`counter`](https://py-branches.readthedocs.io/en/latest/counter.html) | Cap the total number of times a child runs |
 | [`latch`](https://py-branches.readthedocs.io/en/latest/latch.html) | Make a child's first SUCCESS permanent |
@@ -180,6 +181,25 @@ tree = py_trees.trees.BehaviourTree(root=child)
 # Log a line only when a leaf changes status, and time every RUNNING stretch
 tree.visitors.append(StatusTransitionVisitor())
 tree.visitors.append(TimerVisitor())
+```
+
+### Clock — test timing without sleeping
+
+Every behavior that measures elapsed time takes a keyword-only `clock`. It
+defaults to the real one, so production trees need not pass it; tests hand it a
+`ManualClock` and step time forward instead of waiting.
+
+```python
+from py_branches.clock import ManualClock
+from py_branches.cooldown import Cooldown
+
+clock = ManualClock()
+cooled = Cooldown(child, name="Cooldown", duration=5.0, clock=clock)
+
+cooled.tick_once()  # runs
+cooled.tick_once()  # cooling, child not ticked
+clock.advance(5.0)  # no real time passes
+cooled.tick_once()  # re-armed, exactly on the boundary
 ```
 
 ## Running Tests
