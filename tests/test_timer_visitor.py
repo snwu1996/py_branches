@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 import logging
+import random
 import re
 import time
-import random
 
 import py_trees
 
 from py_branches.pause import PauseUniform
 from py_branches.visitors import TimerVisitor
-
 
 _DURATION_RE = re.compile(r"ran for (\d+\.\d+)s")
 

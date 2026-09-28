@@ -24,11 +24,11 @@ pattern that sometimes skips a step:
     root = run_alternating("AlternateWithRandom", [a, b_maybe], [3, 2])
 """
 
-import py_trees
-import random
 import logging
+import random
 import time
-from typing import List
+
+import py_trees
 
 
 class RandomRun(py_trees.decorators.Decorator):
@@ -74,7 +74,7 @@ class RandomRun(py_trees.decorators.Decorator):
             raise ValueError(
                 f"Probability == {probability} but needs to be in range [0, 1.0]"
             )
-        super(RandomRun, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._probability = probability
         self._run = (
             None  # rolled on first tick; terminate() handles all subsequent rolls
@@ -85,11 +85,9 @@ class RandomRun(py_trees.decorators.Decorator):
         if self._run is None:
             self._run = random.random() <= self._probability
         if not self._run:
-            for node in py_trees.behaviour.Behaviour.tick(self):
-                yield node
+            yield from py_trees.behaviour.Behaviour.tick(self)
         else:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
 
     def update(self):
         if self._run:
@@ -141,7 +139,7 @@ class RandomDelay(py_trees.decorators.Decorator):
             raise ValueError(f"low({low}) must be >= 0.")
         if low > high:
             raise ValueError(f"low({low}) must be <= high({high}).")
-        super(RandomDelay, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._low = low
         self._high = high
         self._delay = 0.0
@@ -162,15 +160,14 @@ class RandomDelay(py_trees.decorators.Decorator):
                 return
             self._waiting = False
 
-        for node in super().tick():
-            yield node
+        yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         return self.decorated.status
 
 
 def random_selector(
-    name, behaviors: List[py_trees.behaviour.Behaviour], probabilities: List[float]
+    name, behaviors: list[py_trees.behaviour.Behaviour], probabilities: list[float]
 ):
     """Build a Selector that picks one child according to absolute weights.
 
@@ -227,7 +224,7 @@ def random_selector(
     children = []
     new_probabilities = []
     cumulative_prob = 0.0
-    for behavior, raw_prob in zip(behaviors, probabilities):
+    for behavior, raw_prob in zip(behaviors, probabilities, strict=True):
         new_prob = raw_prob / (1.0 - cumulative_prob)
         if new_prob >= 1.0:
             children.append(behavior)

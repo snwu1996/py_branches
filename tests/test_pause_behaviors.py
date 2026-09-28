@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-import py_trees
-import time
 import datetime
 import random
+import time
 
 import numpy as np
+import py_trees
 import pytest
 
-from py_branches.pause import PauseUniform
-from py_branches.pause import PauseSchedule
 from py_branches.pause import PausePDF
+from py_branches.pause import PauseSchedule
+from py_branches.pause import PauseUniform
 from py_branches.pause import PauseUntilKey
 
 

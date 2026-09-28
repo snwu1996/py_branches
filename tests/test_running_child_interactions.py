@@ -17,7 +17,6 @@ from py_branches.alternating import RunEveryX
 from py_branches.alternating import run_alternating
 from py_branches.latch import Latch
 
-
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
 _f = py_trees.common.Status.FAILURE
@@ -31,7 +30,7 @@ class MultiTickBehavior(py_trees.behaviour.Behaviour):
     """
 
     def __init__(self, name, running_ticks, final_status=_s):
-        super(MultiTickBehavior, self).__init__(name=name)
+        super().__init__(name=name)
         self._running_ticks = running_ticks
         self._final_status = final_status
         self.update_count = 0

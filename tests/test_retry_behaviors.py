@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import time
+
 import py_trees
 
 from py_branches.retry import Retry
-
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS

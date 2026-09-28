@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-import pytest
+import random
+
 import py_trees
 import py_trees.console as console
-import random
+
 from py_branches.alternating import ActivateBehavior
 from py_branches.alternating import RunEveryRange
-from py_branches.alternating import run_alternating
 from py_branches.alternating import RunEveryX
-
+from py_branches.alternating import run_alternating
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
@@ -18,7 +18,7 @@ _i = py_trees.common.Status.INVALID
 
 class GuardedBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name="guarded_behavior"):
-        super(GuardedBehavior, self).__init__(name=name)
+        super().__init__(name=name)
         self.reset()
 
     def reset(self):
@@ -65,8 +65,8 @@ def check_guarded_behavior(
 
 def check_guarded_behaviors(activate_list, guarded_behaviors):
     print(console.bold + f"{activate_list}: {[b.name for b in guarded_behaviors]}")
-    for i, (activate, guarded_behavior_i) in enumerate(
-        zip(activate_list, guarded_behaviors)
+    for activate, guarded_behavior_i in zip(
+        activate_list, guarded_behaviors, strict=True
     ):
         assert guarded_behavior_i.initialised == activate
         assert guarded_behavior_i.updated == activate
@@ -129,7 +129,7 @@ def test_activate_decorator_multiple():
     # Test deactivate behaviour
     new_activate_list = [False, False, False]
     for activate, guarded_behavior_i, activate_guarded_behavior_i in zip(
-        new_activate_list, guarded_behaviors, guarded_behavior_decorators
+        new_activate_list, guarded_behaviors, guarded_behavior_decorators, strict=True
     ):
         guarded_behavior_i.reset()
         guarded_behavior_i.status = _i

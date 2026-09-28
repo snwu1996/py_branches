@@ -18,10 +18,9 @@ skipped tick reports: FAILURE by default, which a parent Selector reads as
 Sequence. Which one you want depends entirely on the composite above it.
 """
 
-import py_trees
 import random
-from typing import List
-from typing import Tuple
+
+import py_trees
 
 
 class ActivateBehavior(py_trees.decorators.Decorator):
@@ -63,7 +62,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
         activate: bool,
         success_if_skip: bool = False,
     ):
-        super(ActivateBehavior, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._activate = activate
         self._success_if_skip = success_if_skip
 
@@ -83,8 +82,7 @@ class ActivateBehavior(py_trees.decorators.Decorator):
                 self.stop(py_trees.common.Status.FAILURE)
             yield self
         else:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         return self.decorated.status
@@ -100,8 +98,8 @@ class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
     def __init__(
         self,
         name: str,
-        activatable_behaviors: List[ActivateBehavior],
-        counts: List[int],
+        activatable_behaviors: list[ActivateBehavior],
+        counts: list[int],
     ):
         self._counts = counts
         self._current_behavior_idx = 0
@@ -130,7 +128,7 @@ class _RunAlternatingHelper(py_trees.behaviour.Behaviour):
 
 
 def run_alternating(
-    name: str, behaviors: List[py_trees.behaviour.Behaviour], counts: List[int]
+    name: str, behaviors: list[py_trees.behaviour.Behaviour], counts: list[int]
 ):
     """
     Build a Selector that cycles through behaviors, each for a fixed run of ticks.
@@ -181,7 +179,7 @@ def run_alternating(
         )
 
     alternating_behaviors = []
-    for idx, behavior in enumerate(behaviors):
+    for behavior in behaviors:
         activate_decorator = ActivateBehavior(
             behavior, f"activate_{behavior.name}", False
         )
@@ -247,7 +245,7 @@ class RunEveryRange(py_trees.decorators.Decorator):
         child: py_trees.behaviour.Behaviour,
         name: str,
         max_range: int,
-        run_range: Tuple[int, int],
+        run_range: tuple[int, int],
         success_if_skip: bool = False,
     ):
         if run_range[0] > run_range[1]:
@@ -259,7 +257,7 @@ class RunEveryRange(py_trees.decorators.Decorator):
         if run_range[1] > max_range:
             raise ValueError(f"Upper run range must be lower or equal to {max_range}")
 
-        super(RunEveryRange, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._max_range = max_range
         self._run_range = run_range
         self._success_if_skip = success_if_skip
@@ -267,8 +265,7 @@ class RunEveryRange(py_trees.decorators.Decorator):
 
     def tick(self):
         if self._run_range[0] <= self._iteration <= self._run_range[1]:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
         else:
             if self._success_if_skip:
                 self.stop(py_trees.common.Status.SUCCESS)
@@ -342,7 +339,7 @@ class RunEveryX(py_trees.decorators.Decorator):
         self,
         child: py_trees.behaviour.Behaviour,
         name: str,
-        every_x_range: Tuple[int, int],
+        every_x_range: tuple[int, int],
         success_if_skip: bool = False,
     ):
         if every_x_range[0] > every_x_range[1]:
@@ -352,7 +349,7 @@ class RunEveryX(py_trees.decorators.Decorator):
         if every_x_range[0] < 1:
             raise ValueError("Can not have range be lower than 1.")
 
-        super(RunEveryX, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._every_x_range = every_x_range
         self._cycles_remaining = random.randint(*self._every_x_range) - 1
         self._success_if_skip = success_if_skip
@@ -369,8 +366,7 @@ class RunEveryX(py_trees.decorators.Decorator):
                 self.stop(py_trees.common.Status.FAILURE)
             yield self
         else:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
 
     def update(self):
         return self.decorated.status

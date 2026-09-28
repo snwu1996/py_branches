@@ -6,6 +6,7 @@ attempting more than once.
 """
 
 import time
+
 import py_trees
 
 
@@ -56,7 +57,7 @@ class Retry(py_trees.decorators.Decorator):
             raise ValueError(f"max_attempts({max_attempts}) must be greater than 0.")
         if delay < 0.0:
             raise ValueError(f"delay({delay}) must be non-negative.")
-        super(Retry, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._max_attempts = max_attempts
         self._delay = delay
         self._attempts = 0
@@ -78,8 +79,7 @@ class Retry(py_trees.decorators.Decorator):
             else:
                 self._waiting = False
                 self.decorated.stop(py_trees.common.Status.INVALID)
-        for node in super().tick():
-            yield node
+        yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         if self.decorated.status == py_trees.common.Status.SUCCESS:

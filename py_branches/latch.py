@@ -42,7 +42,7 @@ class Latch(py_trees.decorators.Decorator):
     """
 
     def __init__(self, child: py_trees.behaviour.Behaviour, name: str):
-        super(Latch, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._latched = False
 
     def reset(self) -> None:
@@ -54,8 +54,7 @@ class Latch(py_trees.decorators.Decorator):
             self.stop(py_trees.common.Status.SUCCESS)
             yield self
         else:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         if self.decorated.status == py_trees.common.Status.SUCCESS:

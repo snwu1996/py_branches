@@ -60,12 +60,12 @@ Example:
 """
 
 from typing import Any
-from typing import Optional
+
 import py_trees
 
 
 def _get_and_check(
-    bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger
+    bb: py_trees.blackboard.Client, var: str, types: list | None, logger
 ):
     """Read a blackboard variable, logging a warning instead of raising.
 
@@ -133,7 +133,7 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
     """
 
     def __init__(self, name: str, variable_name: str, increment_by: float = 1.0):
-        super(IncrementBlackboardVariable, self).__init__(name)
+        super().__init__(name)
         self._variable_name = variable_name
         self._increment_by = increment_by
         self._return_sucess = False
@@ -204,9 +204,7 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         condition: py_trees.common.Status,
         increment_by: float = 1.0,
     ):
-        super(IncrementBlackboardVariableIfCondition, self).__init__(
-            name=name, child=child
-        )
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._increment_by = increment_by
@@ -268,7 +266,7 @@ class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
         condition: py_trees.common.Status,
         set_to: Any,
     ):
-        super(SetBlackboardVariableIfCondition, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._set_to = set_to
@@ -332,7 +330,7 @@ class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
         equals: Any,
         success_if_skip: bool = True,
     ):
-        super(RunIfBlackboardVariableEquals, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._equals = equals
         self._blackboard = py_trees.blackboard.Client()
@@ -411,7 +409,7 @@ class RunIfBlackboardVariableLessThan(py_trees.decorators.Decorator):
         less_than: Any,
         success_if_skip: bool = True,
     ):
-        super(RunIfBlackboardVariableLessThan, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._less_than = less_than
         self._blackboard = py_trees.blackboard.Client()
@@ -491,7 +489,7 @@ class RunIfBlackboardVariableGreaterThan(py_trees.decorators.Decorator):
         greater_than: Any,
         success_if_skip: bool = True,
     ):
-        super(RunIfBlackboardVariableGreaterThan, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._greater_than = greater_than
         self._blackboard = py_trees.blackboard.Client()

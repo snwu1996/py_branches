@@ -10,7 +10,6 @@ from py_branches.pause import add_variance_to_datetime_time
 from py_branches.pause import datetime_time_to_sec
 from py_branches.pause import load_schedule_file
 
-
 _SCHEDULE_KEYS = {
     "start_pause_time",
     "stop_pause_time",

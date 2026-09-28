@@ -18,19 +18,16 @@ over, so they tick cooperatively rather than blocking the tree.
 :func:`add_variance_to_datetime_time` are the time helpers behind it.
 """
 
-import logging
-import time
-import py_trees
 import datetime
-import random
-import yaml
+import logging
 import os
-from typing import Dict
-from typing import List
+import random
+import time
 
 import numpy as np
+import py_trees
+import yaml
 from sklearn.neighbors import KernelDensity
-
 
 HOUR2SEC = 3600
 MIN2SEC = 60
@@ -68,7 +65,7 @@ class PauseUniform(py_trees.behaviour.Behaviour):
     """
 
     def __init__(self, name: str, low: float, high: float):
-        super(PauseUniform, self).__init__(name=name)
+        super().__init__(name=name)
         self._high = high
         self._low = low
 
@@ -140,12 +137,12 @@ class PausePDF(py_trees.behaviour.Behaviour):
         min_t: float = 0.0,
         max_t: float = float("inf"),
     ):
-        super(PausePDF, self).__init__(name=name)
+        super().__init__(name=name)
         if not os.path.isfile(filepath):
             raise FileNotFoundError(f"filepath: {filepath} is not a valid file")
 
         samples = []
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -205,7 +202,7 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
     """
 
     def __init__(self, name: str, key: str, listener_factory=_create_keyboard_listener):
-        super(PauseUntilKey, self).__init__(name=name)
+        super().__init__(name=name)
         self._key = key
         self._listener_factory = listener_factory
         self._listener = None
@@ -289,7 +286,7 @@ def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]]
             f"schedule_filepath: {schedule_filepath} is not a valid file"
         )
 
-    with open(schedule_filepath, "r") as schedule_file:
+    with open(schedule_filepath) as schedule_file:
         schedule_raw = yaml.safe_load(schedule_file)
 
     if schedule_raw is None:
@@ -406,10 +403,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
             root.add_children([pause, main_behavior])
     """
 
-    def __init__(self, name: str, schedule: List[Dict[str, datetime.time]]):
+    def __init__(self, name: str, schedule: list[dict[str, datetime.time]]):
         self._schedule = schedule
         self._last_schedule_idx = None
-        super(PauseSchedule, self).__init__(name=name)
+        super().__init__(name=name)
 
     def initialise(self):
         super().initialise()

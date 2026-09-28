@@ -3,11 +3,10 @@ import py_trees
 
 from py_branches.blackboard import IncrementBlackboardVariable
 from py_branches.blackboard import IncrementBlackboardVariableIfCondition
-from py_branches.blackboard import SetBlackboardVariableIfCondition
 from py_branches.blackboard import RunIfBlackboardVariableEquals
-from py_branches.blackboard import RunIfBlackboardVariableLessThan
 from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
-
+from py_branches.blackboard import RunIfBlackboardVariableLessThan
+from py_branches.blackboard import SetBlackboardVariableIfCondition
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS

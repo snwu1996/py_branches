@@ -6,7 +6,6 @@ import py_trees
 
 from py_branches.visitors import StatusTransitionVisitor
 
-
 _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 _VISITOR_LOGGER = "py_branches.visitors"
 

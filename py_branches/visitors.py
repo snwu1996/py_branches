@@ -19,10 +19,8 @@ change the tree's shape:
 import logging
 import time
 import uuid
-from typing import Dict, Optional
 
 import py_trees
-
 
 _ANSI_RESET = "\033[0m"
 _ANSI_BY_STATUS = {
@@ -41,11 +39,11 @@ class StatusTransitionVisitor(py_trees.visitors.VisitorBase):
 
     def __init__(
         self,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
         level: int = logging.INFO,
     ) -> None:
         super().__init__(full=True)
-        self._last: Dict[str, py_trees.common.Status] = {}
+        self._last: dict[str, py_trees.common.Status] = {}
         self._logger = logger if logger is not None else logging.getLogger(__name__)
         self._level = level
 
@@ -78,7 +76,7 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
         level: int = logging.INFO,
     ) -> None:
         super().__init__(full=False)
-        self._running_starts: Dict[uuid.UUID, float] = {}
+        self._running_starts: dict[uuid.UUID, float] = {}
         self._logger = logging.getLogger(__name__)
         self._level = level
 

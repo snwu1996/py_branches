@@ -6,6 +6,7 @@ completions of its child.
 """
 
 import time
+
 import py_trees
 
 
@@ -54,7 +55,7 @@ class Cooldown(py_trees.decorators.Decorator):
     ):
         if duration <= 0.0:
             raise ValueError(f"duration({duration}) must be positive.")
-        super(Cooldown, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._duration = duration
         self._success_if_cooling = success_if_cooling
         self._cooling = False
@@ -73,8 +74,7 @@ class Cooldown(py_trees.decorators.Decorator):
             else:
                 self._cooling = False
 
-        for node in super().tick():
-            yield node
+        yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         status = self.decorated.status

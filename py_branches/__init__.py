@@ -37,3 +37,19 @@ from . import random
 from . import retry
 from . import timeout
 from . import visitors
+
+# Re-exported so `import py_branches` gives access to every submodule without
+# a second import; listed here so the linter reads them as the public surface
+# they are rather than unused imports.
+__all__ = [
+    "alternating",
+    "blackboard",
+    "cooldown",
+    "counter",
+    "latch",
+    "pause",
+    "random",
+    "retry",
+    "timeout",
+    "visitors",
+]

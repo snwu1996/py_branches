@@ -2,10 +2,10 @@
 #
 # Full reference: https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as _package_version
 import os
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _package_version
 
 # tree_examples.py (the diagram factories) and _ext/render_trees.py (the
 # extension that calls them) sit beside this file rather than in the installed

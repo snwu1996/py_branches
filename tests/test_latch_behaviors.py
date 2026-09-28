@@ -4,7 +4,6 @@ import py_trees
 
 from py_branches.latch import Latch
 
-
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
 _f = py_trees.common.Status.FAILURE
@@ -57,7 +56,7 @@ def test_latch_does_not_engage_while_running():
     child = TrackingBehavior("child", _r)
     latch = Latch(child, name="latch")
 
-    for i in range(3):
+    for _ in range(3):
         latch.tick_once()
         assert latch.status == _r
         assert not latch._latched

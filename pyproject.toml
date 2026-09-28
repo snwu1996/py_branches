@@ -95,6 +95,9 @@ docstring-code-format = false
 select = ["E4", "E7", "E9", "F", "A", "B", "BLE", "I", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
+# The seed must be set before py_branches.random is imported, so these
+# imports deliberately sit below a statement.
+"tests/test_random_behaviors.py" = ["E402"]
 # Sphinx dictates these module-level names; they are config, not our API.
 "docs/conf.py" = ["A001"]
 

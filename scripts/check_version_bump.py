@@ -18,8 +18,9 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 # (epoch-less) release segment plus an optional pre/post/dev suffix, e.g. 1.2.3rc1
 _VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*)(.*)$")

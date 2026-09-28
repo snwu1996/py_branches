@@ -4,7 +4,6 @@ import py_trees
 
 from py_branches.counter import Counter
 
-
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
 _f = py_trees.common.Status.FAILURE

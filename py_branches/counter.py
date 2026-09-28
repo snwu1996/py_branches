@@ -59,7 +59,7 @@ class Counter(py_trees.decorators.Decorator):
     ):
         if num_runs < 1:
             raise ValueError(f"num_runs({num_runs}) must be greater than 0.")
-        super(Counter, self).__init__(name=name, child=child)
+        super().__init__(name=name, child=child)
         self._num_runs = num_runs
         self._completion_status = completion_status
         self._runs_completed = 0
@@ -75,8 +75,7 @@ class Counter(py_trees.decorators.Decorator):
             self.stop(self._completion_status)
             yield self
         else:
-            for node in super().tick():
-                yield node
+            yield from super().tick()
 
     def update(self) -> py_trees.common.Status:
         status = self.decorated.status
