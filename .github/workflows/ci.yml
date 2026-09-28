@@ -11,24 +11,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    # Only the 3.14 leg is allowed to fail; every supported version is a gate.
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
-      # Without this a red 3.14 leg would cancel the supported ones and hide
-      # whatever else broke.
-      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        experimental: [false]
-        include:
-          # Advisory, not supported: poetry.lock pins scipy 1.15.3 and
-          # scikit-learn 1.7.2, both of which predate 3.14, so this leg is
-          # expected to fail while resolving rather than on our own code.
-          # Relock, get it green, then drop experimental and add the
-          # classifier -- in that order, so the metadata never claims a
-          # version CI does not exercise.
-          - python-version: "3.14"
-            experimental: true
 
     steps:
       - uses: actions/checkout@v4
