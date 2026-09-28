@@ -58,12 +58,15 @@ Example:
         root = py_trees.composites.Sequence(name="Root", memory=True)
         root.add_children([increment, gate])
 """
+
 from typing import Any
-from typing import Optional
+
 import py_trees
 
 
-def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[list], logger):
+def _get_and_check(
+    bb: py_trees.blackboard.Client, var: str, types: list | None, logger
+):
     """Read a blackboard variable, logging a warning instead of raising.
 
     Args:
@@ -81,16 +84,23 @@ def _get_and_check(bb: py_trees.blackboard.Client, var: str, types: Optional[lis
     try:
         value = bb.get(var)
     except KeyError:
-        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        logger.warning(
+            f"Tried to access blackboard variable {var} but it does not exist."
+        )
         return None
     if value is None:
-        logger.warning(f'Tried to access blackboard variable {var} but it does not exist.')
+        logger.warning(
+            f"Tried to access blackboard variable {var} but it does not exist."
+        )
         return None
     if types is not None and type(value) not in types:
-        logger.warning(f'Tried to access blackboard variable {var} ' +
-            f'of type {type(value)}, variable must be one of {types}.')
+        logger.warning(
+            f"Tried to access blackboard variable {var} "
+            + f"of type {type(value)}, variable must be one of {types}."
+        )
         return None
     return value
+
 
 class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
     """Increment a numeric blackboard variable, as a leaf behavior.
@@ -121,23 +131,28 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
                 name="IncrementCounter", variable_name="counter", increment_by=1
             )
     """
-    def __init__(self, name: str, variable_name: str, increment_by: float=1.0):
-        super(IncrementBlackboardVariable, self).__init__(name)
+
+    def __init__(self, name: str, variable_name: str, increment_by: float = 1.0):
+        super().__init__(name)
         self._variable_name = variable_name
         self._increment_by = increment_by
         self._return_sucess = False
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.WRITE
+        )
 
     def initialise(self):
         self._return_sucess = False
-        current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
+        current_value = _get_and_check(
+            self._blackboard, self._variable_name, [int, float], self.logger
+        )
         if current_value is None:
             self.logger.warning(
-                f'Failed to increment blackboard variable {self._variable_name}: value missing or invalid.'
+                f"Failed to increment blackboard variable {self._variable_name}: value missing or invalid."
             )
             return
-        self._blackboard.set(self._variable_name, current_value+self._increment_by)
+        self._blackboard.set(self._variable_name, current_value + self._increment_by)
         self._return_sucess = True
 
     def update(self):
@@ -145,6 +160,7 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.SUCCESS
         else:
             return py_trees.common.Status.FAILURE
+
 
 class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
     """Increment a blackboard variable when the child returns a given status.
@@ -179,21 +195,38 @@ class IncrementBlackboardVariableIfCondition(py_trees.decorators.Decorator):
                 increment_by=1,
             )
     """
-    def __init__(self, child, name: str, variable_name: str, condition: py_trees.common.Status, increment_by: float=1.0):
-        super(IncrementBlackboardVariableIfCondition, self).__init__(name=name, child=child)
+
+    def __init__(
+        self,
+        child,
+        name: str,
+        variable_name: str,
+        condition: py_trees.common.Status,
+        increment_by: float = 1.0,
+    ):
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._increment_by = increment_by
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.WRITE
+        )
 
     def update(self):
         if self.decorated.status == self._condition:
-            current_value = _get_and_check(self._blackboard, self._variable_name, [int, float], self.logger)
+            current_value = _get_and_check(
+                self._blackboard, self._variable_name, [int, float], self.logger
+            )
             if current_value is not None:
-                self._blackboard.set(self._variable_name, current_value+self._increment_by, overwrite=True)
+                self._blackboard.set(
+                    self._variable_name,
+                    current_value + self._increment_by,
+                    overwrite=True,
+                )
 
         return self.decorated.status
+
 
 class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
     """Set a blackboard variable when the child returns a given status.
@@ -224,19 +257,30 @@ class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
                 set_to=False,
             )
     """
-    def __init__(self, child, name: str, variable_name: str, condition: py_trees.common.Status, set_to: Any):
-        super(SetBlackboardVariableIfCondition, self).__init__(name=name, child=child)
+
+    def __init__(
+        self,
+        child,
+        name: str,
+        variable_name: str,
+        condition: py_trees.common.Status,
+        set_to: Any,
+    ):
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._condition = condition
         self._set_to = set_to
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.WRITE)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.WRITE
+        )
 
     def update(self):
         if self.decorated.status == self._condition:
             self._blackboard.set(self._variable_name, self._set_to, overwrite=True)
 
         return self.decorated.status
+
 
 class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
     """Run the child only when a blackboard variable equals a given value.
@@ -277,19 +321,35 @@ class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):
                 success_if_skip=True,
             )
     """
-    def __init__(self, child, name: str, variable_name: str, equals: Any, success_if_skip: bool=True):
-        super(RunIfBlackboardVariableEquals, self).__init__(name=name, child=child)
+
+    def __init__(
+        self,
+        child,
+        name: str,
+        variable_name: str,
+        equals: Any,
+        success_if_skip: bool = True,
+    ):
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._equals = equals
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.READ
+        )
         self._run_child = False
-        self._ret_status_on_failure = py_trees.common.Status.SUCCESS if success_if_skip else py_trees.common.Status.FAILURE
+        self._ret_status_on_failure = (
+            py_trees.common.Status.SUCCESS
+            if success_if_skip
+            else py_trees.common.Status.FAILURE
+        )
 
     def tick(self):
         # Re-evaluate the condition on each fresh entry; preserve it while child is RUNNING.
         if self.status != py_trees.common.Status.RUNNING:
-            current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
+            current_value = _get_and_check(
+                self._blackboard, self._variable_name, None, self.logger
+            )
             self._run_child = current_value == self._equals
 
         if self._run_child:
@@ -340,19 +400,37 @@ class RunIfBlackboardVariableLessThan(py_trees.decorators.Decorator):
                 less_than=5,
             )
     """
-    def __init__(self, child, name: str, variable_name: str, less_than: Any, success_if_skip: bool=True):
-        super(RunIfBlackboardVariableLessThan, self).__init__(name=name, child=child)
+
+    def __init__(
+        self,
+        child,
+        name: str,
+        variable_name: str,
+        less_than: Any,
+        success_if_skip: bool = True,
+    ):
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._less_than = less_than
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.READ
+        )
         self._run_child = False
-        self._ret_status_on_failure = py_trees.common.Status.SUCCESS if success_if_skip else py_trees.common.Status.FAILURE
+        self._ret_status_on_failure = (
+            py_trees.common.Status.SUCCESS
+            if success_if_skip
+            else py_trees.common.Status.FAILURE
+        )
 
     def tick(self):
         if self.status != py_trees.common.Status.RUNNING:
-            current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
-            self._run_child = current_value is not None and current_value < self._less_than
+            current_value = _get_and_check(
+                self._blackboard, self._variable_name, None, self.logger
+            )
+            self._run_child = (
+                current_value is not None and current_value < self._less_than
+            )
 
         if self._run_child:
             for node in py_trees.decorators.Decorator.tick(self):
@@ -402,19 +480,37 @@ class RunIfBlackboardVariableGreaterThan(py_trees.decorators.Decorator):
                 greater_than=100,
             )
     """
-    def __init__(self, child, name: str, variable_name: str, greater_than: Any, success_if_skip: bool=True):
-        super(RunIfBlackboardVariableGreaterThan, self).__init__(name=name, child=child)
+
+    def __init__(
+        self,
+        child,
+        name: str,
+        variable_name: str,
+        greater_than: Any,
+        success_if_skip: bool = True,
+    ):
+        super().__init__(name=name, child=child)
         self._variable_name = variable_name
         self._greater_than = greater_than
         self._blackboard = py_trees.blackboard.Client()
-        self._blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
+        self._blackboard.register_key(
+            key=variable_name, access=py_trees.common.Access.READ
+        )
         self._run_child = False
-        self._ret_status_on_failure = py_trees.common.Status.SUCCESS if success_if_skip else py_trees.common.Status.FAILURE
+        self._ret_status_on_failure = (
+            py_trees.common.Status.SUCCESS
+            if success_if_skip
+            else py_trees.common.Status.FAILURE
+        )
 
     def tick(self):
         if self.status != py_trees.common.Status.RUNNING:
-            current_value = _get_and_check(self._blackboard, self._variable_name, None, self.logger)
-            self._run_child = current_value is not None and current_value > self._greater_than
+            current_value = _get_and_check(
+                self._blackboard, self._variable_name, None, self.logger
+            )
+            self._run_child = (
+                current_value is not None and current_value > self._greater_than
+            )
 
         if self._run_child:
             for node in py_trees.decorators.Decorator.tick(self):

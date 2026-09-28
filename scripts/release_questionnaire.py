@@ -21,8 +21,8 @@ push does not wipe the answers. ``parse`` writes ``key=value`` lines to stdout
 from __future__ import annotations
 
 import argparse
-import sys
 import re
+import sys
 from pathlib import Path
 
 # Every questionnaire comment starts with this so the workflow can find the one
@@ -44,6 +44,7 @@ def render(
 
     Keys in *checked* are rendered already ticked.
     """
+
     def box(key: str, label: str) -> str:
         mark = "x" if key in checked else " "
         return f"- [{mark}] {label} <!--k:{key}-->"

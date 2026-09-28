@@ -1,0 +1,16 @@
+ci:
+  autofix_prs: true
+  autoupdate_schedule: monthly
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      # Lint first: --fix can rewrite code, and the formatter should have the
+      # last word on how the result is laid out.
+      - id: ruff-check
+        args: [--fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]

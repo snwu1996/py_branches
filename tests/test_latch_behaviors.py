@@ -4,7 +4,6 @@ import py_trees
 
 from py_branches.latch import Latch
 
-
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
 _f = py_trees.common.Status.FAILURE
@@ -12,7 +11,8 @@ _i = py_trees.common.Status.INVALID
 
 
 class TrackingBehavior(py_trees.behaviour.Behaviour):
-    '''Behaviour that counts how many times it has been ticked.'''
+    """Behaviour that counts how many times it has been ticked."""
+
     def __init__(self, name, return_status):
         super().__init__(name=name)
         self._return_status = return_status
@@ -24,9 +24,9 @@ class TrackingBehavior(py_trees.behaviour.Behaviour):
 
 
 def test_latch_engages_on_success():
-    '''Once child returns SUCCESS, subsequent ticks never re-run the child.'''
-    child = TrackingBehavior('child', _s)
-    latch = Latch(child, name='latch')
+    """Once child returns SUCCESS, subsequent ticks never re-run the child."""
+    child = TrackingBehavior("child", _s)
+    latch = Latch(child, name="latch")
 
     latch.tick_once()
     assert latch.status == _s
@@ -40,9 +40,9 @@ def test_latch_engages_on_success():
 
 
 def test_latch_does_not_engage_on_failure():
-    '''Child returning FAILURE does not engage the latch.'''
-    child = TrackingBehavior('child', _f)
-    latch = Latch(child, name='latch')
+    """Child returning FAILURE does not engage the latch."""
+    child = TrackingBehavior("child", _f)
+    latch = Latch(child, name="latch")
 
     for i in range(3):
         latch.tick_once()
@@ -52,20 +52,20 @@ def test_latch_does_not_engage_on_failure():
 
 
 def test_latch_does_not_engage_while_running():
-    '''Child returning RUNNING does not engage the latch.'''
-    child = TrackingBehavior('child', _r)
-    latch = Latch(child, name='latch')
+    """Child returning RUNNING does not engage the latch."""
+    child = TrackingBehavior("child", _r)
+    latch = Latch(child, name="latch")
 
-    for i in range(3):
+    for _ in range(3):
         latch.tick_once()
         assert latch.status == _r
         assert not latch._latched
 
 
 def test_latch_reset_allows_rerun():
-    '''reset() disengages the latch and lets the child run again.'''
-    child = TrackingBehavior('child', _s)
-    latch = Latch(child, name='latch')
+    """reset() disengages the latch and lets the child run again."""
+    child = TrackingBehavior("child", _s)
+    latch = Latch(child, name="latch")
 
     # Engage latch
     latch.tick_once()
@@ -85,9 +85,9 @@ def test_latch_reset_allows_rerun():
 
 
 def test_latch_reset_multiple_cycles():
-    '''Latch can be engaged, reset, and re-engaged multiple times.'''
-    child = TrackingBehavior('child', _s)
-    latch = Latch(child, name='latch')
+    """Latch can be engaged, reset, and re-engaged multiple times."""
+    child = TrackingBehavior("child", _s)
+    latch = Latch(child, name="latch")
 
     for cycle in range(3):
         latch.tick_once()
@@ -105,9 +105,9 @@ def test_latch_reset_multiple_cycles():
 
 
 def test_latch_state_persists_across_reentry():
-    '''_latched is not cleared by initialise(); it persists until reset().'''
-    child = TrackingBehavior('child', _s)
-    latch = Latch(child, name='latch')
+    """_latched is not cleared by initialise(); it persists until reset()."""
+    child = TrackingBehavior("child", _s)
+    latch = Latch(child, name="latch")
 
     # Engage
     latch.tick_once()

@@ -4,12 +4,14 @@
 A single decorator, :class:`Timeout`, which converts an over-running child
 into a FAILURE so a tree cannot stall indefinitely on one branch.
 """
+
 import time
+
 import py_trees
 
 
 class Timeout(py_trees.decorators.Decorator):
-    '''
+    """
     Fails a child behavior if it stays RUNNING beyond the specified duration.
 
     - If the child returns SUCCESS or FAILURE before the timeout, that
@@ -36,13 +38,12 @@ class Timeout(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Running(name="Slow")
             # Fail if child does not complete within 5 seconds.
             guarded = Timeout(child, name="Timeout", duration=5.0)
-    '''
-    def __init__(self, child: py_trees.behaviour.Behaviour,
-                       name: str,
-                       duration: float):
+    """
+
+    def __init__(self, child: py_trees.behaviour.Behaviour, name: str, duration: float):
         if duration <= 0.0:
-            raise ValueError(f'duration({duration}) must be positive.')
-        super(Timeout, self).__init__(name=name, child=child)
+            raise ValueError(f"duration({duration}) must be positive.")
+        super().__init__(name=name, child=child)
         self._duration = duration
         self._start_time: float | None = None
 

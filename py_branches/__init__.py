@@ -26,6 +26,7 @@ Most of the decorators take a ``success_if_skip`` flag, which decides what a
 skipped tick reports to the parent composite — FAILURE reads as "try the next
 child" to a Selector, SUCCESS makes the skip invisible to a Sequence.
 """
+
 from . import alternating
 from . import blackboard
 from . import cooldown
@@ -36,3 +37,19 @@ from . import random
 from . import retry
 from . import timeout
 from . import visitors
+
+# Re-exported so `import py_branches` gives access to every submodule without
+# a second import; listed here so the linter reads them as the public surface
+# they are rather than unused imports.
+__all__ = [
+    "alternating",
+    "blackboard",
+    "cooldown",
+    "counter",
+    "latch",
+    "pause",
+    "random",
+    "retry",
+    "timeout",
+    "visitors",
+]

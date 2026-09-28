@@ -2,68 +2,68 @@
 #
 # Full reference: https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as _package_version
 import os
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _package_version
 
 # tree_examples.py (the diagram factories) and _ext/render_trees.py (the
 # extension that calls them) sit beside this file rather than in the installed
 # package, so neither is importable without help.
 _HERE = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, _HERE)
-sys.path.insert(0, os.path.join(_HERE, '_ext'))
+sys.path.insert(0, os.path.join(_HERE, "_ext"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'py_branches'
-author = 'Shunong Wu'
-copyright = '2024, Shunong Wu'  # noqa: A001 - Sphinx requires this name.
+project = "py_branches"
+author = "Shunong Wu"
+copyright = "2024, Shunong Wu"  # noqa: A001 - Sphinx requires this name.
 
 try:
     # Single source of truth: the installed package version, which poetry
     # takes from pyproject.toml. CI already enforces a version bump per
     # release PR, so hardcoding it here would just create a second place to
     # forget.
-    release = _package_version('py_branches')
+    release = _package_version("py_branches")
 except PackageNotFoundError:
     # Building against a source tree that was never installed.
-    release = '0.0.0+unknown'
+    release = "0.0.0+unknown"
 
 # Short X.Y version shown in the sidebar.
-version = '.'.join(release.split('.')[:2])
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.doctest',
-    'sphinx.ext.graphviz',
-    'sphinx_autodoc_typehints',
-    'myst_parser',
-    'render_trees',
-    'sphinx_sitemap',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.doctest",
+    "sphinx.ext.graphviz",
+    "sphinx_autodoc_typehints",
+    "myst_parser",
+    "render_trees",
+    "sphinx_sitemap",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The docs are authored in Markdown; MyST handles it. reStructuredText still
 # works for anything that needs a directive MyST cannot express inline.
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
+    ".rst": "restructuredtext",
+    ".md": "markdown",
 }
 
 # -- MyST ---------------------------------------------------------------------
 
 myst_enable_extensions = [
-    'colon_fence',
-    'deflist',
-    'fieldlist',
+    "colon_fence",
+    "deflist",
+    "fieldlist",
 ]
 
 # Generate anchors for headings so cross-file links to sections resolve.
@@ -72,23 +72,23 @@ myst_heading_anchors = 3
 # -- Autodoc ------------------------------------------------------------------
 
 autodoc_default_options = {
-    'members': True,
+    "members": True,
     # Everything here subclasses py_trees.behaviour.Behaviour or
     # py_trees.decorators.Decorator, and knowing which is load-bearing when
     # reading the API.
-    'show-inheritance': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
+    "show-inheritance": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
     # Private helpers like _RunAlternatingHelper and _get_and_check are
     # implementation detail.
-    'exclude-members': '__weakref__',
+    "exclude-members": "__weakref__",
 }
 
 # Signatures stay clean; types are rendered into the parameter descriptions by
 # sphinx_autodoc_typehints.
-autodoc_typehints = 'description'
-autodoc_typehints_description_target = 'documented_params'
+autodoc_typehints = "description"
+autodoc_typehints_description_target = "documented_params"
 
 # Docstrings are Google-style (see py_branches/visitors.py for the reference
 # shape), so napoleon parses them and NumPy-style parsing stays off.
@@ -99,22 +99,22 @@ napoleon_include_init_with_doc = True
 # -- Intersphinx --------------------------------------------------------------
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'py_trees': ('https://py-trees.readthedocs.io/en/devel/', None),
-    'numpy': ('https://numpy.org/doc/stable/', None),
+    "python": ("https://docs.python.org/3", None),
+    "py_trees": ("https://py-trees.readthedocs.io/en/devel/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 # -- HTML output --------------------------------------------------------------
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
-html_title = f'{project} {version}'
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
+html_title = f"{project} {version}"
 
 # Read the Docs serves the same pages under /latest/ and /stable/. Without a
 # base URL Sphinx emits no canonical link, so search engines treat those as
 # duplicates and split the ranking between them. This points every page at the
 # version the badge and the README link to.
-html_baseurl = 'https://py-branches.readthedocs.io/en/latest/'
+html_baseurl = "https://py-branches.readthedocs.io/en/latest/"
 
 # -- Sitemap ------------------------------------------------------------------
 
@@ -122,19 +122,19 @@ html_baseurl = 'https://py-branches.readthedocs.io/en/latest/'
 # which is right for a multi-version build. This build is published at one
 # canonical prefix (html_baseurl above), so the entries are written straight
 # under it.
-sitemap_url_scheme = '{link}'
+sitemap_url_scheme = "{link}"
 
 html_theme_options = {
-    'navigation_depth': 3,
-    'collapse_navigation': False,
-    'sticky_navigation': True,
-    'style_external_links': True,
+    "navigation_depth": 3,
+    "collapse_navigation": False,
+    "sticky_navigation": True,
+    "style_external_links": True,
 }
 
 # -- Graphviz -----------------------------------------------------------------
 
 # SVG stays sharp at any zoom and keeps text selectable; the default is PNG.
-graphviz_output_format = 'svg'
+graphviz_output_format = "svg"
 
 # -- Doctest ------------------------------------------------------------------
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import time
+
 import py_trees
 
 from py_branches.timeout import Timeout
-
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
@@ -13,10 +13,11 @@ _i = py_trees.common.Status.INVALID
 
 
 class RunningThenBehavior(py_trees.behaviour.Behaviour):
-    '''
+    """
     Stays RUNNING for run_ticks ticks, then returns final_status.
     Resets on initialise().
-    '''
+    """
+
     def __init__(self, name, run_ticks, final_status):
         super().__init__(name=name)
         self._run_ticks = run_ticks
@@ -34,27 +35,27 @@ class RunningThenBehavior(py_trees.behaviour.Behaviour):
 
 
 def test_timeout_child_succeeds_immediately():
-    '''Child returns SUCCESS before timeout; Timeout passes SUCCESS through.'''
-    child = py_trees.behaviours.Success(name='success')
-    timeout = Timeout(child, name='timeout', duration=5.0)
+    """Child returns SUCCESS before timeout; Timeout passes SUCCESS through."""
+    child = py_trees.behaviours.Success(name="success")
+    timeout = Timeout(child, name="timeout", duration=5.0)
 
     timeout.tick_once()
     assert timeout.status == _s
 
 
 def test_timeout_child_fails_immediately():
-    '''Child returns FAILURE before timeout; Timeout passes FAILURE through.'''
-    child = py_trees.behaviours.Failure(name='failure')
-    timeout = Timeout(child, name='timeout', duration=5.0)
+    """Child returns FAILURE before timeout; Timeout passes FAILURE through."""
+    child = py_trees.behaviours.Failure(name="failure")
+    timeout = Timeout(child, name="timeout", duration=5.0)
 
     timeout.tick_once()
     assert timeout.status == _f
 
 
 def test_timeout_child_completes_before_deadline():
-    '''Child stays RUNNING briefly then succeeds; Timeout returns SUCCESS.'''
-    child = RunningThenBehavior('child', run_ticks=2, final_status=_s)
-    timeout = Timeout(child, name='timeout', duration=5.0)
+    """Child stays RUNNING briefly then succeeds; Timeout returns SUCCESS."""
+    child = RunningThenBehavior("child", run_ticks=2, final_status=_s)
+    timeout = Timeout(child, name="timeout", duration=5.0)
 
     timeout.tick_once()
     assert timeout.status == _r
@@ -67,10 +68,10 @@ def test_timeout_child_completes_before_deadline():
 
 
 def test_timeout_expires_while_running():
-    '''Child stays RUNNING past the timeout; Timeout returns FAILURE.'''
-    child = RunningThenBehavior('child', run_ticks=100, final_status=_s)
+    """Child stays RUNNING past the timeout; Timeout returns FAILURE."""
+    child = RunningThenBehavior("child", run_ticks=100, final_status=_s)
     duration = 0.05
-    timeout = Timeout(child, name='timeout', duration=duration)
+    timeout = Timeout(child, name="timeout", duration=duration)
 
     timeout.tick_once()
     assert timeout.status == _r
@@ -83,10 +84,10 @@ def test_timeout_expires_while_running():
 
 
 def test_timeout_resets_on_reinitialise():
-    '''After a timeout, the timer resets when the decorator is re-entered.'''
-    child = RunningThenBehavior('child', run_ticks=100, final_status=_s)
+    """After a timeout, the timer resets when the decorator is re-entered."""
+    child = RunningThenBehavior("child", run_ticks=100, final_status=_s)
     duration = 0.05
-    timeout = Timeout(child, name='timeout', duration=duration)
+    timeout = Timeout(child, name="timeout", duration=duration)
 
     # First run: let the timeout expire
     timeout.tick_once()

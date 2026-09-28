@@ -18,8 +18,9 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 # (epoch-less) release segment plus an optional pre/post/dev suffix, e.g. 1.2.3rc1
 _VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*)(.*)$")
@@ -65,17 +66,29 @@ def fail(message: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, type=Path,
-                        help="pyproject.toml as it exists on the base branch")
-    parser.add_argument("--head", required=True, type=Path,
-                        help="pyproject.toml from the pull request head")
+    parser.add_argument(
+        "--base",
+        required=True,
+        type=Path,
+        help="pyproject.toml as it exists on the base branch",
+    )
+    parser.add_argument(
+        "--head",
+        required=True,
+        type=Path,
+        help="pyproject.toml from the pull request head",
+    )
     args = parser.parse_args()
 
     head_project, head_poetry = read_versions(args.head)
     base_project, base_poetry = read_versions(args.base)
 
     # 1. The two declarations in the head file must agree.
-    if head_project is not None and head_poetry is not None and head_project != head_poetry:
+    if (
+        head_project is not None
+        and head_poetry is not None
+        and head_project != head_poetry
+    ):
         fail(
             "pyproject.toml versions disagree: "
             f"[project].version = {head_project!r}, "

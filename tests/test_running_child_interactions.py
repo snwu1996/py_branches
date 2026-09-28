@@ -9,13 +9,13 @@ to skip, advance, or latch in the meantime.
 Several of these document behaviour that may not be intended -- see the
 comments on individual tests.
 """
+
 import py_trees
 
 from py_branches.alternating import RunEveryRange
 from py_branches.alternating import RunEveryX
 from py_branches.alternating import run_alternating
 from py_branches.latch import Latch
-
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
@@ -30,7 +30,7 @@ class MultiTickBehavior(py_trees.behaviour.Behaviour):
     """
 
     def __init__(self, name, running_ticks, final_status=_s):
-        super(MultiTickBehavior, self).__init__(name=name)
+        super().__init__(name=name)
         self._running_ticks = running_ticks
         self._final_status = final_status
         self.update_count = 0
@@ -53,7 +53,7 @@ class MultiTickBehavior(py_trees.behaviour.Behaviour):
 
 def test_multi_tick_behavior_helper():
     # The harness itself, so a failure elsewhere is not misread.
-    behavior = MultiTickBehavior('slow', running_ticks=2)
+    behavior = MultiTickBehavior("slow", running_ticks=2)
 
     behavior.tick_once()
     assert behavior.status == _r
@@ -69,8 +69,8 @@ def test_multi_tick_behavior_helper():
 
 
 def test_latch_passes_running_through_without_latching():
-    slow = MultiTickBehavior('slow', running_ticks=2)
-    latch = Latch(slow, name='latch')
+    slow = MultiTickBehavior("slow", running_ticks=2)
+    latch = Latch(slow, name="latch")
 
     latch.tick_once()
     assert latch.status == _r
@@ -82,8 +82,8 @@ def test_latch_passes_running_through_without_latching():
 
 
 def test_latch_engages_only_after_running_child_completes():
-    slow = MultiTickBehavior('slow', running_ticks=2)
-    latch = Latch(slow, name='latch')
+    slow = MultiTickBehavior("slow", running_ticks=2)
+    latch = Latch(slow, name="latch")
 
     for _ in range(3):
         latch.tick_once()
@@ -100,8 +100,8 @@ def test_latch_engages_only_after_running_child_completes():
 
 
 def test_latch_never_engages_for_a_child_that_only_fails():
-    slow = MultiTickBehavior('slow', running_ticks=1, final_status=_f)
-    latch = Latch(slow, name='latch')
+    slow = MultiTickBehavior("slow", running_ticks=1, final_status=_f)
+    latch = Latch(slow, name="latch")
 
     latch.tick_once()
     assert latch.status == _r
@@ -115,13 +115,13 @@ def test_latch_never_engages_for_a_child_that_only_fails():
 
 
 def test_run_every_x_abandons_a_child_that_is_still_running():
-    '''The skip branch fires on cycle count alone, mid-run or not.
+    """The skip branch fires on cycle count alone, mid-run or not.
 
     RunEveryX.tick checks _cycles_remaining before delegating, so a child left
     RUNNING from the previous tick is dropped rather than allowed to finish.
-    '''
-    slow = MultiTickBehavior('slow', running_ticks=3)
-    every_x = RunEveryX(slow, name='every_x', every_x_range=(2, 2))
+    """
+    slow = MultiTickBehavior("slow", running_ticks=3)
+    every_x = RunEveryX(slow, name="every_x", every_x_range=(2, 2))
 
     # Cycle 1: skipped.
     every_x.tick_once()
@@ -141,13 +141,13 @@ def test_run_every_x_abandons_a_child_that_is_still_running():
 
 
 def test_run_every_range_counts_an_external_invalidation_as_a_cycle():
-    '''terminate() advances the cycle on any stop, including INVALID.
+    """terminate() advances the cycle on any stop, including INVALID.
 
     A parent composite invalidating this decorator mid-run therefore consumes
     a cycle that the child never got to use.
-    '''
-    slow = MultiTickBehavior('slow', running_ticks=5)
-    every_range = RunEveryRange(slow, name='every_range', max_range=3, run_range=(1, 1))
+    """
+    slow = MultiTickBehavior("slow", running_ticks=5)
+    every_range = RunEveryRange(slow, name="every_range", max_range=3, run_range=(1, 1))
 
     every_range.tick_once()
     assert every_range.status == _r
@@ -165,7 +165,7 @@ def test_run_every_range_counts_an_external_invalidation_as_a_cycle():
 
 
 def test_run_alternating_counts_ticks_not_completions():
-    '''A RUNNING child spends one "run" per tick, not one per completion.
+    """A RUNNING child spends one "run" per tick, not one per completion.
 
     _RunAlternatingHelper increments its counter in initialise(), and the
     selector is built without memory, so every tick re-enters the helper and
@@ -175,10 +175,10 @@ def test_run_alternating_counts_ticks_not_completions():
 
     This pins current behaviour; whether it is the intended reading of
     "run this behavior N times" is an open question.
-    '''
-    slow = MultiTickBehavior('slow', running_ticks=2)
-    quick = py_trees.behaviours.Success('quick')
-    root = run_alternating('run_alternating', [slow, quick], counts=[2, 2])
+    """
+    slow = MultiTickBehavior("slow", running_ticks=2)
+    quick = py_trees.behaviours.Success("quick")
+    root = run_alternating("run_alternating", [slow, quick], counts=[2, 2])
 
     root.tick_once()
     assert root.status == _r
@@ -198,9 +198,9 @@ def test_run_alternating_counts_ticks_not_completions():
 
 def test_run_alternating_completes_children_that_finish_in_one_tick():
     # The contrast case: single-tick children do get their full count.
-    first = MultiTickBehavior('first', running_ticks=0)
-    second = MultiTickBehavior('second', running_ticks=0)
-    root = run_alternating('run_alternating', [first, second], counts=[2, 1])
+    first = MultiTickBehavior("first", running_ticks=0)
+    second = MultiTickBehavior("second", running_ticks=0)
+    root = run_alternating("run_alternating", [first, second], counts=[2, 1])
 
     for _ in range(3):
         root.tick_once()

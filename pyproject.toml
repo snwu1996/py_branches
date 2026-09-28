@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py_branches"
-version = "1.5.2"
+version = "1.5.3"
 description = "Reusable behavior-tree behaviors and decorators for Python, built on py_trees."
 authors = ["Shunong Wu <shunongwu@gmail.com>"]
 license = "BSD"
@@ -76,6 +76,35 @@ typeCheckingMode = "basic"
 # No venvPath/venv: pyright resolves imports from whichever interpreter is on
 # PATH, so `poetry run pyright` works against the active venv both locally and
 # in CI, wherever poetry puts it.
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = false
+
+[tool.ruff.lint]
+# Ruff's defaults (E4/E7/E9, F) plus the families this codebase already
+# reaches for: A and BLE are here because the tree carries noqa codes for
+# both, so the rules were being honoured by hand before anything enforced
+# them.
+select = ["E4", "E7", "E9", "F", "A", "B", "BLE", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# The seed must be set before py_branches.random is imported, so these
+# imports deliberately sit below a statement.
+"tests/test_random_behaviors.py" = ["E402"]
+# Sphinx dictates these module-level names; they are config, not our API.
+"docs/conf.py" = ["A001"]
+
+[tool.ruff.lint.isort]
+# __init__.py imports each submodule on its own line; keep that shape rather
+# than letting isort collapse them into one `from . import a, b, c`.
+force-single-line = true
 
 [tool.coverage.run]
 source = ["py_branches"]

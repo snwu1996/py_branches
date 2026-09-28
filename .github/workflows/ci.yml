@@ -130,6 +130,46 @@ jobs:
         # longer matches the code it documents fails the build.
         run: poetry run sphinx-build -b doctest docs docs/_build/doctest
 
+  ruff:
+    # Formatting and lint gate. Ruff is not a project dependency — it is
+    # installed standalone so poetry.lock stays untouched — and the version
+    # comes from .pre-commit-config.yaml so CI and the local hook can never
+    # disagree about what counts as formatted.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        # Anchored to the ruff-pre-commit block so adding another hook repo
+        # cannot silently point this at the wrong rev.
+        run: |
+          version="$(awk '
+            /^ *- *repo: .*ruff-pre-commit/ { found = 1; next }
+            found && /^ *rev: / { sub(/^ *rev: *v?/, ""); print; exit }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$version" ]; then
+            echo "could not read the ruff rev from .pre-commit-config.yaml" >&2
+            exit 1
+          fi
+          echo "pinning ruff==$version"
+          pip install "ruff==$version"
+
+      - name: Check formatting
+        # --diff rather than --check: the log then shows what the formatter
+        # would change, so a failure is actionable without running it locally.
+        run: ruff format --diff .
+
+      - name: Lint
+        # No --fix in CI; a rewrite that never gets committed just hides the
+        # finding.
+        run: ruff check --output-format=github .
+
   version:
     # Release PRs must bump the version; label a PR 'no-version-bump' to skip.
     if: >-

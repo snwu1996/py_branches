@@ -15,19 +15,18 @@ change the tree's shape:
     tree.visitors.append(StatusTransitionVisitor())
     tree.visitors.append(TimerVisitor())
 """
+
 import logging
 import time
 import uuid
-from typing import Dict, Optional
 
 import py_trees
 
-
-_ANSI_RESET = '\033[0m'
+_ANSI_RESET = "\033[0m"
 _ANSI_BY_STATUS = {
-    py_trees.common.Status.SUCCESS: '\033[32m',  # green
-    py_trees.common.Status.RUNNING: '\033[37m',  # white
-    py_trees.common.Status.FAILURE: '\033[31m',  # red
+    py_trees.common.Status.SUCCESS: "\033[32m",  # green
+    py_trees.common.Status.RUNNING: "\033[37m",  # white
+    py_trees.common.Status.FAILURE: "\033[31m",  # red
 }
 
 
@@ -40,11 +39,11 @@ class StatusTransitionVisitor(py_trees.visitors.VisitorBase):
 
     def __init__(
         self,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
         level: int = logging.INFO,
     ) -> None:
         super().__init__(full=True)
-        self._last: Dict[str, py_trees.common.Status] = {}
+        self._last: dict[str, py_trees.common.Status] = {}
         self._logger = logger if logger is not None else logging.getLogger(__name__)
         self._level = level
 
@@ -59,8 +58,8 @@ class StatusTransitionVisitor(py_trees.visitors.VisitorBase):
         self._last[nid] = curr
         if curr == py_trees.common.Status.INVALID:
             return
-        color = _ANSI_BY_STATUS.get(curr, '')
-        msg = f'{color}[{behaviour.name}] {curr.name}{_ANSI_RESET}'
+        color = _ANSI_BY_STATUS.get(curr, "")
+        msg = f"{color}[{behaviour.name}] {curr.name}{_ANSI_RESET}"
         self._logger.log(self._level, msg)
 
 
@@ -77,7 +76,7 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
         level: int = logging.INFO,
     ) -> None:
         super().__init__(full=False)
-        self._running_starts: Dict[uuid.UUID, float] = {}
+        self._running_starts: dict[uuid.UUID, float] = {}
         self._logger = logging.getLogger(__name__)
         self._level = level
 
@@ -89,7 +88,9 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
         elif not is_running and behaviour.id in self._running_starts:
             start = self._running_starts.pop(behaviour.id)
             duration = time.time() - start
-            self._logger.log(self._level, f'[timer] {behaviour.name} ran for {duration:.3f}s')
+            self._logger.log(
+                self._level, f"[timer] {behaviour.name} ran for {duration:.3f}s"
+            )
 
 
-__all__ = ['StatusTransitionVisitor', 'TimerVisitor']
+__all__ = ["StatusTransitionVisitor", "TimerVisitor"]

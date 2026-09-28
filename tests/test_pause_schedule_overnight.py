@@ -8,6 +8,7 @@ built on datetime.now() would behave differently depending on the hour CI runs
 at, and the 'now is after start' case computes a wait of up to ~24 hours. So
 these tests freeze the clock inside py_branches.pause instead.
 """
+
 import datetime
 import time
 
@@ -47,7 +48,7 @@ def freeze_now(monkeypatch):
         now_dt = datetime.datetime.combine(
             datetime.date.today(), datetime.time(hour, minute, second)
         )
-        monkeypatch.setattr(pause, 'datetime', _FakeDatetimeModule(now_dt))
+        monkeypatch.setattr(pause, "datetime", _FakeDatetimeModule(now_dt))
         return now_dt
 
     return _freeze
@@ -55,19 +56,21 @@ def freeze_now(monkeypatch):
 
 def _schedule(start, stop):
     """One zero-variance schedule entry, as load_schedule_file would build it."""
-    return [{
-        'start_pause_time': start,
-        'stop_pause_time': stop,
-        'variance_time': datetime.time(0, 0, 0),
-        'start_plus_variance_time': start,
-        'stop_plus_variance_time': stop,
-    }]
+    return [
+        {
+            "start_pause_time": start,
+            "stop_pause_time": stop,
+            "variance_time": datetime.time(0, 0, 0),
+            "start_plus_variance_time": start,
+            "stop_plus_variance_time": stop,
+        }
+    ]
 
 
 def test_overnight_window_matches_before_midnight(freeze_now):
     freeze_now(23, 30, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -79,7 +82,7 @@ def test_overnight_window_matches_before_midnight(freeze_now):
 def test_overnight_window_matches_after_midnight(freeze_now):
     freeze_now(0, 30, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -91,7 +94,7 @@ def test_overnight_window_matches_after_midnight(freeze_now):
 def test_overnight_window_wait_spans_midnight_exactly(freeze_now):
     freeze_now(23, 59, 59)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(0, 0, 1))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -104,7 +107,7 @@ def test_overnight_window_wait_spans_midnight_exactly(freeze_now):
 def test_overnight_window_does_not_match_midday(freeze_now):
     freeze_now(12, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -117,7 +120,7 @@ def test_overnight_window_boundaries_are_exclusive(freeze_now):
     # Exactly on start: the match uses `now > start`, so this is outside.
     freeze_now(23, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -128,7 +131,7 @@ def test_overnight_window_stop_boundary_is_exclusive(freeze_now):
     # Exactly on stop: `now < stop` is false and `now > start` is false.
     freeze_now(1, 0, 0)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -138,7 +141,7 @@ def test_overnight_window_stop_boundary_is_exclusive(freeze_now):
 def test_same_day_window_wait_does_not_roll_over(freeze_now):
     freeze_now(12, 0, 0)
     schedule = _schedule(datetime.time(11, 0, 0), datetime.time(13, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
@@ -151,7 +154,7 @@ def test_overnight_window_completes_after_wait_elapses(freeze_now):
     # A two-second wait that straddles midnight, short enough to wait out.
     freeze_now(23, 59, 59)
     schedule = _schedule(datetime.time(23, 0, 0), datetime.time(0, 0, 1))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.RUNNING
@@ -167,7 +170,7 @@ def test_overnight_window_selects_matching_entry_among_several(freeze_now):
     freeze_now(23, 30, 0)
     schedule = _schedule(datetime.time(2, 0, 0), datetime.time(3, 0, 0))
     schedule += _schedule(datetime.time(23, 0, 0), datetime.time(1, 0, 0))
-    pause_schedule = PauseSchedule('pause_schedule', schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule)
 
     pause_schedule.tick_once()
 
