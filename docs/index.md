@@ -34,6 +34,7 @@ pip install -e .
 | {doc}`random` | Probabilistic execution and weighted random selection |
 | {doc}`retry` | Re-run a child that fails, optionally with a delay |
 | {doc}`runtime` | Run a tree as a process — rate, signals, exit codes, teardown |
+| {doc}`surgery` | Edit a built tree — walk, find, replace, prune, graft, reset |
 | {doc}`timeout` | Fail a child that stays RUNNING too long |
 | {doc}`visitors` | Log status transitions and time spent RUNNING |
 
@@ -60,6 +61,11 @@ sleeping through it.
 anything in it: a rate, signal handling, an exit code, and teardown that runs on
 every path. Use it when the tree is a process that has to exit cleanly; py_trees'
 own `tick_tock` is enough when it is not.
+
+**How do I change a tree that is already built?** {doc}`surgery` — walk it,
+find nodes by name, type or predicate, and replace, prune or graft them with the
+re-parenting done correctly. It is the only module here that acts on the tree's
+structure rather than living inside it.
 
 {doc}`pause`, uniquely, is the tree deliberately doing nothing for a while.
 
@@ -90,6 +96,7 @@ pause
 random
 retry
 runtime
+surgery
 timeout
 visitors
 ```

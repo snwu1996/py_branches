@@ -145,6 +145,7 @@ graphviz_output_format = "svg"
 doctest_global_setup = """
 import py_trees
 
+from py_branches import surgery
 from py_branches.alternating import ActivateBehavior
 from py_branches.alternating import RunEveryRange
 from py_branches.alternating import RunEveryX

@@ -21,6 +21,8 @@ Module                         What it covers
 :mod:`py_branches.retry`       Retrying a failing child
 :mod:`py_branches.runtime`     Running a tree as a process: pacing,
                                signals, exit codes and teardown
+:mod:`py_branches.surgery`     Editing a tree after it is built: walk, find,
+                               replace, prune, graft
 :mod:`py_branches.timeout`     Failing a child that runs too long
 :mod:`py_branches.visitors`    Logging status transitions and run durations
 ============================== ================================================
@@ -44,6 +46,7 @@ from . import pause
 from . import random
 from . import retry
 from . import runtime
+from . import surgery
 from . import timeout
 from . import visitors
 
@@ -61,6 +64,7 @@ __all__ = [
     "random",
     "retry",
     "runtime",
+    "surgery",
     "timeout",
     "visitors",
 ]

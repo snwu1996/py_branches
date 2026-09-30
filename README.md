@@ -37,6 +37,7 @@ pip install -e .
 | [`random`](https://py-branches.readthedocs.io/en/latest/random.html) | Probabilistic execution and weighted random selection |
 | [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child that fails, optionally with a delay |
 | [`runtime`](https://py-branches.readthedocs.io/en/latest/runtime.html) | Run a tree as a process — rate, signals, exit codes, teardown |
+| [`surgery`](https://py-branches.readthedocs.io/en/latest/surgery.html) | Edit a built tree — walk, find, replace, prune, graft, reset |
 | [`timeout`](https://py-branches.readthedocs.io/en/latest/timeout.html) | Fail a child that stays RUNNING too long |
 | [`visitors`](https://py-branches.readthedocs.io/en/latest/visitors.html) | Log status transitions and time spent RUNNING |
 
@@ -170,6 +171,26 @@ retried = Retry(child, name="Retry", max_attempts=3, delay=0.5)
 
 # FAILURE if the child stays RUNNING for more than 2 seconds
 bounded = Timeout(child, name="Timeout", duration=2.0)
+```
+
+### Surgery — edit a tree after it is built
+
+```python
+from py_branches import surgery
+from py_branches.pause import PauseUniform, PauseUntilKey
+
+# Replace every real pause with "press space to continue", including the ones
+# hiding under decorators - a plain isinstance(node, Composite) walk misses
+# those, because a py_trees Decorator is not a Composite.
+swapped = surgery.swap_type(
+    tree.root,
+    (PauseUniform,),
+    lambda old: PauseUntilKey(name=old.name, key="space"),
+)
+
+surgery.find_by_name(tree.root, "random_break_pause")
+surgery.replace(old_node, new_node)  # re-parents, and fixes decorator.decorated
+surgery.reset_subtree(tree.root)  # re-arm every Latch and Counter
 ```
 
 ### Visitors — see what the tree actually did
