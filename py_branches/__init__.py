@@ -19,6 +19,8 @@ Module                         What it covers
 :mod:`py_branches.pause`       Waiting: random, sampled, keyboard or scheduled
 :mod:`py_branches.random`      Probabilistic execution and weighted selection
 :mod:`py_branches.retry`       Retrying a failing child
+:mod:`py_branches.runtime`     Running a tree as a process: pacing,
+                               signals, exit codes and teardown
 :mod:`py_branches.timeout`     Failing a child that runs too long
 :mod:`py_branches.visitors`    Logging status transitions and run durations
 ============================== ================================================
@@ -41,6 +43,7 @@ from . import latch
 from . import pause
 from . import random
 from . import retry
+from . import runtime
 from . import timeout
 from . import visitors
 
@@ -57,6 +60,7 @@ __all__ = [
     "pause",
     "random",
     "retry",
+    "runtime",
     "timeout",
     "visitors",
 ]

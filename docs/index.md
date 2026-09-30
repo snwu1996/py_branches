@@ -33,6 +33,7 @@ pip install -e .
 | {doc}`pause` | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | {doc}`random` | Probabilistic execution and weighted random selection |
 | {doc}`retry` | Re-run a child that fails, optionally with a delay |
+| {doc}`runtime` | Run a tree as a process — rate, signals, exit codes, teardown |
 | {doc}`timeout` | Fail a child that stays RUNNING too long |
 | {doc}`visitors` | Log status transitions and time spent RUNNING |
 
@@ -54,6 +55,11 @@ than placed in it, so they observe without altering control flow.
 **How do I test it?** {doc}`clock` — every behavior that measures elapsed time
 takes a keyword-only `clock`, so a test can step time forward instead of
 sleeping through it.
+
+**How do I run it?** {doc}`runtime` — the loop around the tree rather than
+anything in it: a rate, signal handling, an exit code, and teardown that runs on
+every path. Use it when the tree is a process that has to exit cleanly; py_trees'
+own `tick_tock` is enough when it is not.
 
 {doc}`pause`, uniquely, is the tree deliberately doing nothing for a while.
 
@@ -83,6 +89,7 @@ latch
 pause
 random
 retry
+runtime
 timeout
 visitors
 ```

@@ -36,6 +36,7 @@ pip install -e .
 | [`pause`](https://py-branches.readthedocs.io/en/latest/pause.html) | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | [`random`](https://py-branches.readthedocs.io/en/latest/random.html) | Probabilistic execution and weighted random selection |
 | [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child that fails, optionally with a delay |
+| [`runtime`](https://py-branches.readthedocs.io/en/latest/runtime.html) | Run a tree as a process — rate, signals, exit codes, teardown |
 | [`timeout`](https://py-branches.readthedocs.io/en/latest/timeout.html) | Fail a child that stays RUNNING too long |
 | [`visitors`](https://py-branches.readthedocs.io/en/latest/visitors.html) | Log status transitions and time spent RUNNING |
 
