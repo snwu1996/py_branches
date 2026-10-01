@@ -1,6 +1,6 @@
 # pause
 
-Four leaf behaviors that hold a tree still, differing only in where the wait
+Five leaf behaviors that hold a tree still, differing only in where the wait
 comes from. All of them return RUNNING while waiting and SUCCESS once done, so
 the rest of the tree keeps ticking — none of them block.
 
@@ -8,10 +8,42 @@ the rest of the tree keeps ticking — none of them block.
 
 | | Waits for | Use for |
 |---|---|---|
-| `PauseUniform` | A duration drawn between two bounds | General jitter, think time |
+| `PauseUniform` | A duration drawn between two bounds | General jitter, anything in a range |
+| `PauseNormal` | A duration clustered around a typical value | Think time with a believable spread |
 | `PausePDF` | A duration drawn from recorded samples | Reproducing observed timing distributions |
 | `PauseUntilKey` | A key press | Operator-gated steps, debugging |
 | `PauseSchedule` | A wall-clock window from a YAML file | Idling overnight, or over lunch |
+
+`PauseNormal` is the middle ground, and the cheapest of the three: two numbers
+rather than a flat range or a file of recorded timings, and nothing beyond
+`random.normalvariate` from the standard library. `PausePDF` is the one that
+costs something — it fits a kernel density estimate, so it pulls in numpy and
+scikit-learn — and it only earns that cost when you have real timings to
+reproduce.
+
+One caveat on `PauseNormal`: a normal distribution is symmetric. That fits a
+wait which genuinely clusters around a typical value, but human reaction and
+dwell times are not symmetric — mostly short, with an occasional long tail — so
+a log-normal distribution describes them better.
+
+## Truncation
+
+`PauseNormal` and `PausePDF` both draw from a distribution that extends past the
+duration you want, and both handle it the same way: a draw outside
+`[min_t, max_t]` is **rejected and redrawn**, not clamped to the nearest bound.
+Clamping would be simpler, but it piles probability mass exactly on the bounds —
+a pause that lands on precisely 0.000 s a few percent of the time is a tell.
+Rejection keeps the truncated distribution's shape.
+
+`PauseNormal`'s `min_t` defaults to `0.0`, so a negative pause is impossible
+however large `sigma` is relative to `mean`.
+
+The resampling loop is bounded by `max_rejections` (default 100). With sensible
+parameters that is unreachable, so exhausting it means the bounds and the
+distribution disagree — `mean` sitting many `sigma` outside the permitted range,
+or `PausePDF` bounds that exclude the sample data. Both raise a `ValueError`
+naming the parameters involved, which is a far better failure than spinning
+forever inside a tick.
 
 ## Schedule files
 

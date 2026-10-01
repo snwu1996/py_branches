@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import math
 import random
 import time
 
@@ -8,6 +9,7 @@ import py_trees
 import pytest
 
 from py_branches.clock import ManualClock
+from py_branches.pause import PauseNormal
 from py_branches.pause import PausePDF
 from py_branches.pause import PauseSchedule
 from py_branches.pause import PauseUniform
@@ -356,3 +358,109 @@ def test_pause_pdf_boundary_is_exact_on_manual_clock(tmp_path):
     clock.advance(0.001)
     pause.tick_once()
     assert pause.status == py_trees.common.Status.SUCCESS
+
+
+def test_pause_normal_returns_running_then_success():
+    clock = ManualClock()
+    pause = PauseNormal("pause_normal", 1.2, 0.3, clock=clock, rng=random.Random(0))
+
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.RUNNING
+    sampled = pause._pause_t
+    assert sampled > 0.0
+
+    clock.advance(sampled - 0.001)
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.RUNNING
+
+    clock.advance(0.001)
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.SUCCESS
+
+
+def test_pause_normal_resamples_on_fresh_entry():
+    pause = PauseNormal("pause_normal", 1.0, 0.25, rng=random.Random(1))
+    samples = []
+    for _ in range(5):
+        pause.initialise()
+        samples.append(pause._pause_t)
+    assert len(set(samples)) > 1
+
+
+def test_pause_normal_respects_min_t():
+    # mean sits on the bound, so roughly half of all draws are rejected.
+    pause = PauseNormal("pause_normal", 0.5, 1.0, min_t=0.5, rng=random.Random(2))
+    assert all(pause._sample() >= 0.5 for _ in range(1000))
+
+
+def test_pause_normal_respects_max_t():
+    pause = PauseNormal(
+        "pause_normal", 1.0, 1.0, min_t=0.0, max_t=1.0, rng=random.Random(3)
+    )
+    assert all(0.0 <= pause._sample() <= 1.0 for _ in range(1000))
+
+
+def test_pause_normal_distribution_shape():
+    """Catches a variance-for-sigma mix-up that a bounds check would not."""
+    mean, sigma, n = 10.0, 1.0, 5000
+    # Bounds wide enough that no draw is rejected, so this is the untruncated
+    # distribution.
+    pause = PauseNormal(
+        "pause_normal", mean, sigma, min_t=0.0, max_t=20.0, rng=random.Random(4)
+    )
+    samples = [pause._sample() for _ in range(n)]
+    standard_error = sigma / math.sqrt(n)
+    assert abs(sum(samples) / n - mean) < 3 * standard_error
+
+
+def test_pause_normal_rejection_cap_raises():
+    # 100 sigma from the nearest permitted value: it never lands in bounds.
+    pause = PauseNormal("pause_normal", 0.0, 0.01, min_t=100.0)
+    with pytest.raises(ValueError) as excinfo:
+        pause._sample()
+    message = str(excinfo.value)
+    assert "min_t(100.0)" in message
+    assert "sigma=0.01" in message
+
+
+def test_pause_normal_validation():
+    with pytest.raises(ValueError):
+        PauseNormal("pause_normal", 1.0, 0.0)
+    with pytest.raises(ValueError):
+        PauseNormal("pause_normal", 1.0, -0.5)
+    with pytest.raises(ValueError):
+        PauseNormal("pause_normal", 1.0, 0.5, min_t=-1.0)
+    with pytest.raises(ValueError):
+        PauseNormal("pause_normal", 1.0, 0.5, min_t=2.0, max_t=2.0)
+    with pytest.raises(ValueError):
+        PauseNormal("pause_normal", 1.0, 0.5, max_rejections=0)
+
+
+def test_pause_normal_seeded_is_reproducible():
+    first = PauseNormal("first", 1.0, 0.3, rng=random.Random(42))
+    second = PauseNormal("second", 1.0, 0.3, rng=random.Random(42))
+    assert [first._sample() for _ in range(10)] == [second._sample() for _ in range(10)]
+
+
+def test_pause_pdf_rejection_cap_raises(tmp_path):
+    """Bounds that exclude the fitted mass raise instead of hanging the tick."""
+    fp = tmp_path / "waits.txt"
+    _write_floats(fp, [0.5] * 20)
+    pause = PausePDF(
+        "pause_pdf",
+        str(fp),
+        kernel_bandwidth=0.01,
+        min_t=100.0,
+        max_t=200.0,
+        max_rejections=5,
+    )
+    with pytest.raises(ValueError) as excinfo:
+        pause.initialise()
+    assert "min_t(100.0)" in str(excinfo.value)
+
+
+def test_pause_pdf_rejection_cap_validation(tmp_path):
+    fp = tmp_path / "waits.txt"
+    _write_floats(fp, [0.5] * 5)
+    with pytest.raises(ValueError):
+        PausePDF("pause_pdf", str(fp), max_rejections=0)

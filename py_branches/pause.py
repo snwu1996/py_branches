@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Behaviors that hold a tree still for a while.
 
-Four leaf behaviors, differing in where the pause duration comes from:
+Five leaf behaviors, differing in where the pause duration comes from:
 
 * :class:`PauseUniform` — a duration drawn uniformly between two bounds.
+* :class:`PauseNormal` — a duration drawn from a truncated normal
+  distribution, for waits that cluster around a typical value.
 * :class:`PausePDF` — a duration drawn from a kernel density estimate fitted
   to recorded samples, for pauses that mimic observed timing.
 * :class:`PauseUntilKey` — no duration at all; waits for a key press.
@@ -24,6 +26,7 @@ sleeping.
 
 import datetime
 import logging
+import math
 import os
 import random
 
@@ -61,7 +64,34 @@ def _create_keyboard_listener(on_press):
     return keyboard.Listener(on_press=on_press)
 
 
-class PauseUniform(py_trees.behaviour.Behaviour):
+class _SampledPause(py_trees.behaviour.Behaviour):
+    """Base for pauses whose duration is sampled once per fresh entry.
+
+    Subclasses supply :meth:`_sample`; this class owns the clock, records the
+    start time in ``initialise()`` and compares elapsed time against the sample
+    in ``update()``. It is private: the concrete pauses are the public surface.
+    """
+
+    def __init__(self, name: str, *, clock: Clock | None = None):
+        super().__init__(name=name)
+        self._clock = clock if clock is not None else default_clock()
+
+    def _sample(self) -> float:
+        """Return a pause duration in seconds."""
+        raise NotImplementedError
+
+    def initialise(self):
+        self._pause_t = self._sample()
+        self._start_t = self._clock.time()
+
+    def update(self):
+        t_elapse = self._clock.time() - self._start_t
+        if t_elapse < self._pause_t:
+            return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
+
+
+class PauseUniform(_SampledPause):
     """Pause for a duration drawn uniformly from ``[low, high]``.
 
     A new duration is sampled on each fresh entry, using :func:`random.uniform`
@@ -91,24 +121,117 @@ class PauseUniform(py_trees.behaviour.Behaviour):
     def __init__(
         self, name: str, low: float, high: float, *, clock: Clock | None = None
     ):
-        super().__init__(name=name)
+        super().__init__(name=name, clock=clock)
         self._high = high
         self._low = low
-        self._clock = clock if clock is not None else default_clock()
 
-    def initialise(self):
-        self._pause_t = random.uniform(self._low, self._high)
-        self._start_t = self._clock.time()
-
-    def update(self):
-        t_elapse = self._clock.time() - self._start_t
-        if t_elapse < self._pause_t:
-            return py_trees.common.Status.RUNNING
-        else:
-            return py_trees.common.Status.SUCCESS
+    def _sample(self) -> float:
+        return random.uniform(self._low, self._high)
 
 
-class PausePDF(py_trees.behaviour.Behaviour):
+class PauseNormal(_SampledPause):
+    """Pause for a duration drawn from a truncated normal distribution.
+
+    The middle ground between :class:`PauseUniform`, which makes every duration
+    in a range equally likely, and :class:`PausePDF`, which needs a file of
+    recorded samples and fits a kernel density estimate to it. "About 1.2
+    seconds, give or take 0.3" is two numbers here, and needs nothing beyond
+    :func:`random.normalvariate` from the standard library.
+
+    A new duration is sampled on each fresh entry. Draws outside
+    ``[min_t, max_t]`` are rejected and redrawn rather than clamped to the
+    bound, which keeps the truncated distribution's shape instead of piling
+    probability mass exactly on the bounds. ``min_t`` defaults to 0.0, so a
+    negative pause is impossible even when ``sigma`` is large relative to
+    ``mean``.
+
+    Note:
+        A normal distribution is symmetric, which makes it the right model when
+        durations genuinely cluster around a typical value. Human reaction and
+        dwell times are not symmetric — mostly short with an occasional long
+        tail — so a log-normal distribution usually describes them better.
+
+    Args:
+        name (str): Name of this behavior node.
+        mean (float): Mean of the underlying normal distribution, in seconds.
+        sigma (float): Standard deviation of the underlying normal
+            distribution, in seconds. Must be positive.
+        min_t (float): Keyword-only. Lower bound on the sampled pause, in
+            seconds. Default 0.0.
+        max_t (float): Keyword-only. Upper bound on the sampled pause, in
+            seconds. Default unbounded.
+        max_rejections (int): Keyword-only. How many out-of-bounds draws to
+            discard before giving up on a sample. Default 100 — unreachable for
+            sane parameters, so exhausting it means the parameters are wrong.
+        clock (Clock): Time source for the pause, keyword-only. Defaults to the
+            real clock; pass a :class:`py_branches.clock.ManualClock` to
+            control it in tests.
+        rng (Optional[random.Random]): Keyword-only. Source of randomness.
+            Defaults to the :mod:`random` module's shared generator; pass a
+            ``random.Random(seed)`` for reproducible durations.
+
+    Returns:
+        Status: RUNNING until the sampled duration elapses, then SUCCESS.
+
+    Raises:
+        ValueError: If ``sigma`` is not positive, ``min_t`` is negative,
+            ``max_t`` is not above ``min_t``, or ``max_rejections`` is less
+            than 1. Also raised when sampling if ``max_rejections``
+            consecutive draws all fall outside the bounds, which happens when
+            ``mean`` sits many ``sigma`` away from the permitted range.
+
+    Example:
+        .. testcode::
+
+            # Pause for about 1.2 seconds, give or take 0.3, never under 0.5.
+            pause = PauseNormal(name="ThinkTime", mean=1.2, sigma=0.3, min_t=0.5)
+    """
+
+    def __init__(
+        self,
+        name: str,
+        mean: float,
+        sigma: float,
+        *,
+        min_t: float = 0.0,
+        max_t: float = math.inf,
+        max_rejections: int = 100,
+        clock: Clock | None = None,
+        rng: random.Random | None = None,
+    ):
+        if sigma <= 0.0:
+            raise ValueError(f"sigma({sigma}) must be positive.")
+        if min_t < 0.0:
+            raise ValueError(f"min_t({min_t}) must be >= 0.")
+        if max_t <= min_t:
+            raise ValueError(f"max_t({max_t}) must be > min_t({min_t}).")
+        if max_rejections < 1:
+            raise ValueError(f"max_rejections({max_rejections}) must be >= 1.")
+
+        super().__init__(name=name, clock=clock)
+        self._mean = mean
+        self._sigma = sigma
+        self._min_t = min_t
+        self._max_t = max_t
+        self._max_rejections = max_rejections
+        # The random module itself exposes normalvariate, so the default costs
+        # no generator of its own and shares seeding with the rest of py_branches.
+        self._rng = rng if rng is not None else random
+
+    def _sample(self) -> float:
+        for _ in range(self._max_rejections):
+            t_wait = self._rng.normalvariate(self._mean, self._sigma)
+            if self._min_t <= t_wait <= self._max_t:
+                return t_wait
+        raise ValueError(
+            f"{self.name}: {self._max_rejections} consecutive draws from "
+            + f"normal(mean={self._mean}, sigma={self._sigma}) all fell outside "
+            + f"[min_t({self._min_t}), max_t({self._max_t})]; the distribution "
+            + "and the bounds disagree."
+        )
+
+
+class PausePDF(_SampledPause):
     """Pause for a duration sampled from a KDE fit to a file of float samples.
 
     The file holds one float per line, in seconds; blank lines and lines
@@ -120,11 +243,9 @@ class PausePDF(py_trees.behaviour.Behaviour):
     ``[min_t, max_t]``, which is what keeps a Gaussian kernel from ever
     producing a negative pause.
 
-    Warning:
-        The rejection loop has no iteration limit. Bounds that exclude
-        essentially all of the fitted distribution's mass will hang
-        ``initialise()``, so keep ``min_t`` and ``max_t`` consistent with the
-        sample data.
+    The rejection loop is bounded by ``max_rejections``, so bounds that exclude
+    essentially all of the fitted distribution's mass raise a ``ValueError``
+    naming them rather than spinning forever inside a tick.
 
     Args:
         name (str): Name of this behavior node.
@@ -135,6 +256,8 @@ class PausePDF(py_trees.behaviour.Behaviour):
             Default 0.0.
         max_t (float): Upper bound on the sampled pause, in seconds. Default
             unbounded.
+        max_rejections (int): Keyword-only. How many out-of-bounds draws to
+            discard before giving up on a sample. Default 100.
         clock (Clock): Time source for the pause, keyword-only. Defaults to the
             real clock; pass a :class:`py_branches.clock.ManualClock` to
             control it in tests.
@@ -145,6 +268,9 @@ class PausePDF(py_trees.behaviour.Behaviour):
     Raises:
         FileNotFoundError: If ``filepath`` is not a file.
         AssertionError: If the file contains no usable samples.
+        ValueError: If ``max_rejections`` is less than 1, or — when sampling —
+            if that many consecutive draws all fall outside
+            ``[min_t, max_t]``.
 
     Example:
         .. code-block:: python
@@ -167,9 +293,12 @@ class PausePDF(py_trees.behaviour.Behaviour):
         min_t: float = 0.0,
         max_t: float = float("inf"),
         *,
+        max_rejections: int = 100,
         clock: Clock | None = None,
     ):
-        super().__init__(name=name)
+        super().__init__(name=name, clock=clock)
+        if max_rejections < 1:
+            raise ValueError(f"max_rejections({max_rejections}) must be >= 1.")
         if not os.path.isfile(filepath):
             raise FileNotFoundError(f"filepath: {filepath} is not a valid file")
 
@@ -182,25 +311,25 @@ class PausePDF(py_trees.behaviour.Behaviour):
                 samples.append(float(line))
         assert len(samples), f"filepath: {filepath} contains no float samples"
 
+        self._filepath = filepath
         self._min_t = min_t
         self._max_t = max_t
-        self._clock = clock if clock is not None else default_clock()
+        self._max_rejections = max_rejections
         self._model = KernelDensity(bandwidth=kernel_bandwidth, kernel="gaussian")
         self._model.fit(np.asarray(samples).reshape(-1, 1))
 
-    def initialise(self):
-        t_wait = self._min_t - 1.0
-        while not (self._min_t <= t_wait <= self._max_t):
+    def _sample(self) -> float:
+        for _ in range(self._max_rejections):
             t_wait = float(self._model.sample(1)[0][0])  # pyright: ignore
-        self._pause_t = t_wait
-        self._start_t = self._clock.time()
-        self.logger.debug(f"{self.name} sampled pause {self._pause_t:.3f} sec")
-
-    def update(self):
-        t_elapse = self._clock.time() - self._start_t
-        if t_elapse < self._pause_t:
-            return py_trees.common.Status.RUNNING
-        return py_trees.common.Status.SUCCESS
+            if self._min_t <= t_wait <= self._max_t:
+                self.logger.debug(f"{self.name} sampled pause {t_wait:.3f} sec")
+                return t_wait
+        raise ValueError(
+            f"{self.name}: {self._max_rejections} consecutive draws from "
+            + f"{self._filepath} all fell outside "
+            + f"[min_t({self._min_t}), max_t({self._max_t})]; the bounds and "
+            + "the sample data disagree."
+        )
 
 
 class PauseUntilKey(py_trees.behaviour.Behaviour):
