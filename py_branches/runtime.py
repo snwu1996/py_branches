@@ -474,6 +474,13 @@ class TreeRunner:
         on_tick (Optional[Callable[[BehaviourTree], None]]): Called after every
             tick, keyword-only. For a caller that wants a hook without
             attaching a visitor; an exception from it escapes like any other.
+        warn_on_overrun (bool): Log a rate-limited WARNING when a tick takes
+            longer than the period, keyword-only. Default True. Pass False for a
+            tree whose ticks are expected to overrun — one with a blocking leaf,
+            or a deliberately slow rate — where the warning is noise rather than
+            news. :attr:`overruns` still counts them either way, so suppressing
+            the log does not hide the problem, it just stops it filling the
+            log.
         clock (Optional[Clock]): Time source for pacing, keyword-only. Defaults
             to the real clock; pass a :class:`py_branches.clock.ManualClock` to
             make a pacing test exact.
@@ -513,6 +520,7 @@ class TreeRunner:
         signals: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM),
         setup_timeout: float = 15.0,
         on_tick: Callable[[py_trees.trees.BehaviourTree], None] | None = None,
+        warn_on_overrun: bool = True,
         clock: Clock | None = None,
     ) -> None:
         if rate is not None and (not math.isfinite(rate) or rate <= 0.0):
@@ -534,6 +542,7 @@ class TreeRunner:
         self._signals = tuple(signals)
         self._setup_timeout = setup_timeout
         self._on_tick = on_tick
+        self._warn_on_overrun = warn_on_overrun
         self._clock = clock if clock is not None else default_clock()
 
         self._state = RunnerState.IDLE
@@ -577,7 +586,8 @@ class TreeRunner:
         """Number of ticks that took longer than the period.
 
         Always zero when running unpaced (``rate=None``), because there is no
-        period to exceed.
+        period to exceed. Counted regardless of ``warn_on_overrun``, which only
+        silences the log.
 
         Returns:
             int: Overrunning ticks since construction or :meth:`restart`.
@@ -801,9 +811,14 @@ class TreeRunner:
     def _log_overrun(self, elapsed: float) -> None:
         """Warn about an overrunning tick, at most once every few seconds.
 
+        Does nothing when ``warn_on_overrun`` is False; the overrun is still
+        counted by the caller.
+
         Args:
             elapsed (float): How long the tick actually took, in seconds.
         """
+        if not self._warn_on_overrun:
+            return
         now = self._clock.time()
         if (
             self._last_overrun_log is not None

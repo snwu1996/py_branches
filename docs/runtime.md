@@ -74,6 +74,19 @@ being behind.
 ticks is not running at the rate you configured, whatever the configuration
 says.
 
+Some trees overrun by design — one with a blocking leaf, or a rate set low on
+purpose — and there the warning is noise. `warn_on_overrun=False` silences the
+log without touching the accounting:
+
+```python
+runner = TreeRunner(tree, rate=20.0, warn_on_overrun=False)
+runner.run()
+print(runner.overruns)  # still counted
+```
+
+Reach for it once you know why the tree overruns, not to quiet a tree you have
+not explained yet.
+
 ## Stopping
 
 `stop_on` decides whether a terminal status ends the run:
