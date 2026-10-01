@@ -398,8 +398,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
     On each fresh entry this behavior looks for a window containing the current
     wall-clock time. If it finds one, it computes the seconds remaining until
     that window's (variance-adjusted) stop time and stays RUNNING for that long.
-    If the current time falls outside every window, it returns SUCCESS
-    immediately, so the behavior is cheap to tick continuously.
+    If the current time falls outside every window, it returns immediately, so
+    the behavior is cheap to tick continuously: SUCCESS by default, which lets
+    it gate a parent Sequence, or FAILURE with ``fail_outside_window``, which
+    lets a parent Selector fall through to the next child.
 
     Two pieces of state keep it from misbehaving across long runs:
 
@@ -420,10 +422,15 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
             match a window and the remaining-time countdown are read from it,
             so a :class:`py_branches.clock.ManualClock` started at a chosen
             timestamp puts a test at any hour without touching the real clock.
+        fail_outside_window (bool): Return FAILURE instead of SUCCESS when no
+            pause is taken (outside every window, or inside a window already
+            handled), keyword-only. Use it when this behavior is a Selector
+            child that should interrupt the children after it. Default False.
 
     Returns:
-        Status: SUCCESS when outside all windows or once the active window's
-        stop time is reached; RUNNING until then.
+        Status: RUNNING while a pause is active and SUCCESS once the active
+        window's stop time is reached. When no pause is taken, SUCCESS, or
+        FAILURE if ``fail_outside_window`` is set.
 
     Example:
         .. code-block:: python
@@ -438,6 +445,14 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
 
             root = py_trees.composites.Sequence(name="Root", memory=True)
             root.add_children([pause, main_behavior])
+
+            # Or as an interrupt: the Selector runs main_behavior except
+            # while a break is in progress.
+            pause = PauseSchedule(
+                name="ScheduledPause", schedule=schedule, fail_outside_window=True
+            )
+            root = py_trees.composites.Selector(name="Root", memory=False)
+            root.add_children([pause, main_behavior])
     """
 
     def __init__(
@@ -446,8 +461,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         schedule: list[dict[str, datetime.time]],
         *,
         clock: Clock | None = None,
+        fail_outside_window: bool = False,
     ):
         self._schedule = schedule
+        self._fail_outside_window = fail_outside_window
         self._clock = clock if clock is not None else default_clock()
         self._last_schedule_idx = None
         super().__init__(name=name)
@@ -506,6 +523,8 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
 
     def update(self):
         if self._t_wait is None:
+            if self._fail_outside_window:
+                return py_trees.common.Status.FAILURE
             return py_trees.common.Status.SUCCESS
 
         t_elapse = self._clock.time() - self._t_start

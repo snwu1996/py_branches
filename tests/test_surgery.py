@@ -174,7 +174,7 @@ def test_replace_under_a_decorator_rebinds_decorated():
 
 
 def test_replaced_decorator_child_is_the_one_that_ticks():
-    # The assertion that would have caught the osb4 bug at the call site: a
+    # The assertion that would have caught the original bug at the call site: a
     # decorator that kept `decorated` pointing at the old child goes on
     # ticking it, however good the tree renders.
     log = []
@@ -381,8 +381,8 @@ def test_graft_onto_a_leaf_is_an_error():
 
 # -- swap_type ----------------------------------------------------------------
 #
-# The first six port osb4/tests/test_utils.py, which is the regression baseline
-# this module replaces; the rest are what that file missed.
+# The first six port the regression baseline this module replaces; the rest are
+# what that baseline missed.
 
 
 def test_swap_replaces_every_matching_leaf():
@@ -434,8 +434,8 @@ def test_swap_accepts_a_bare_type_as_well_as_a_tuple():
 
 
 def test_swap_reaches_a_pause_inside_a_decorator():
-    # The defect. osb4's Composite-guarded walk returns 0 here and logs it as
-    # success, leaving a real 300-second pause in a debug run.
+    # The defect. The earlier Composite-guarded walk returns 0 here and logs
+    # it as success, leaving a real 300-second pause in a debug run.
     decorated = RandomRun(
         child=PauseUniform(name="random_break_pause", low=1.0, high=300.0),
         name="random_break",

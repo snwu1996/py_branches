@@ -166,6 +166,85 @@ def test_pause_schedule_rearms_after_window_end():
     assert pause_schedule.status == py_trees.common.Status.RUNNING
 
 
+def test_pause_schedule_fail_outside_window():
+    base_dt = datetime.datetime.combine(datetime.date.today(), datetime.time(12, 0, 0))
+    clock = ManualClock(start=base_dt.timestamp())
+
+    start_t = (base_dt + datetime.timedelta(seconds=3)).time()
+    stop_t = (base_dt + datetime.timedelta(seconds=6)).time()
+
+    schedule = [
+        {
+            "start_pause_time": start_t,
+            "stop_pause_time": stop_t,
+            "variance_time": datetime.time(0, 0, 0),
+            "start_plus_variance_time": start_t,
+            "stop_plus_variance_time": stop_t,
+        }
+    ]
+
+    pause_schedule = PauseSchedule(
+        "pause_schedule", schedule, clock=clock, fail_outside_window=True
+    )
+
+    # Outside the window: FAILURE, so a parent Selector falls through.
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.FAILURE
+
+    # Inside the window: RUNNING until the stop time, then SUCCESS.
+    clock.advance(3.05)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
+
+    # Overshoot the stop time rather than landing on it: the countdown check is
+    # `t_elapse < t_wait`, and accumulated float error on the boundary itself
+    # leaves the behavior RUNNING for one more tick.
+    clock.advance(3.0)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.SUCCESS
+
+    # Past the window: FAILURE again.
+    clock.advance(1.0)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.FAILURE
+
+
+def test_pause_schedule_fail_outside_window_interrupts_selector():
+    base_dt = datetime.datetime.combine(datetime.date.today(), datetime.time(12, 0, 0))
+    clock = ManualClock(start=base_dt.timestamp())
+
+    start_t = (base_dt + datetime.timedelta(seconds=3)).time()
+    stop_t = (base_dt + datetime.timedelta(seconds=6)).time()
+
+    schedule = [
+        {
+            "start_pause_time": start_t,
+            "stop_pause_time": stop_t,
+            "variance_time": datetime.time(0, 0, 0),
+            "start_plus_variance_time": start_t,
+            "stop_plus_variance_time": stop_t,
+        }
+    ]
+
+    pause_schedule = PauseSchedule(
+        "pause_schedule", schedule, clock=clock, fail_outside_window=True
+    )
+    work = py_trees.behaviours.Running(name="work")
+    root = py_trees.composites.Selector(
+        name="root", memory=False, children=[pause_schedule, work]
+    )
+
+    # Outside the window the Selector reaches the work behavior.
+    root.tick_once()
+    assert work.status == py_trees.common.Status.RUNNING
+
+    # Inside the window the pause pre-empts it.
+    clock.advance(3.05)
+    root.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
+    assert work.status == py_trees.common.Status.INVALID
+
+
 def test_pause_until_key():
     b = PauseUntilKey("pause_until_key", "a", listener_factory=FakeKeyboardListener)
     b.tick_once()

@@ -185,8 +185,8 @@ def test_restart_clears_a_pending_request():
 # -- ExitBehavior -------------------------------------------------------------
 
 
-def test_exit_behavior_is_backwards_compatible_with_osb4():
-    """osb4 builds it as `ExitBehavior(name='exit_bot')` and ticks it."""
+def test_exit_behavior_is_backwards_compatible_with_legacy_callers():
+    """Existing callers build it as `ExitBehavior(name='exit_bot')` and tick it."""
     node = ExitBehavior(name="exit_bot")
     node.tick_once()
     assert node.status == STATUS.SUCCESS

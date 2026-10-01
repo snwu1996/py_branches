@@ -44,6 +44,21 @@ again, even while the clock is still inside it. It re-arms once the current time
 has left every window. Without this, a tree that ticks after the pause finishes
 would immediately pause again for the rest of the window.
 
+## In a Sequence or a Selector
+
+When no pause is taken, `PauseSchedule` returns SUCCESS by default, so it works
+as a gate at the front of a Sequence: the Sequence waits out a window, then
+carries on. To use it as an interrupt in a Selector instead, pass
+`fail_outside_window=True`: outside a window it returns FAILURE and the Selector
+falls through to the next child, and inside one it stays RUNNING and pre-empts
+the children after it.
+
+```python
+pause = PauseSchedule(name="Break", schedule=schedule, fail_outside_window=True)
+root = py_trees.composites.Selector(name="Root", memory=False)
+root.add_children([pause, main_behavior])
+```
+
 ## API
 
 ```{eval-rst}

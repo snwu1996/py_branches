@@ -120,6 +120,10 @@ if schedule is None:
 # Pauses until the current scheduled window ends; SUCCESS immediately if
 # outside all windows.
 pause = PauseSchedule(name="PauseSchedule", schedule=schedule)
+
+# As a Selector child that interrupts the work after it: FAILURE (fall
+# through) outside all windows, RUNNING during one.
+pause = PauseSchedule(name="PauseSchedule", schedule=schedule, fail_outside_window=True)
 ```
 
 ### Random — probabilistic execution
