@@ -5,9 +5,10 @@ A single decorator, :class:`Retry`, for flaky operations that are worth
 attempting more than once.
 """
 
-import time
-
 import py_trees
+
+from .clock import Clock
+from .clock import default_clock
 
 
 class Retry(py_trees.decorators.Decorator):
@@ -29,6 +30,9 @@ class Retry(py_trees.decorators.Decorator):
             Must be at least 1.
         delay (float): Seconds to wait between retry attempts. Must be
             non-negative. Default 0.0.
+        clock (Clock): Time source for the inter-attempt delay, keyword-only.
+            Defaults to the real clock; pass a
+            :class:`py_branches.clock.ManualClock` to control it in tests.
 
     Raises:
         ValueError: If ``max_attempts`` is less than 1, or ``delay`` is
@@ -52,6 +56,8 @@ class Retry(py_trees.decorators.Decorator):
         name: str,
         max_attempts: int,
         delay: float = 0.0,
+        *,
+        clock: Clock | None = None,
     ):
         if max_attempts < 1:
             raise ValueError(f"max_attempts({max_attempts}) must be greater than 0.")
@@ -60,6 +66,7 @@ class Retry(py_trees.decorators.Decorator):
         super().__init__(name=name, child=child)
         self._max_attempts = max_attempts
         self._delay = delay
+        self._clock = clock if clock is not None else default_clock()
         self._attempts = 0
         self._waiting = False
         self._wait_start: float | None = None
@@ -71,7 +78,7 @@ class Retry(py_trees.decorators.Decorator):
 
     def tick(self):
         if self._waiting and self._wait_start is not None:
-            elapsed = time.time() - self._wait_start
+            elapsed = self._clock.time() - self._wait_start
             if elapsed < self._delay:
                 self.status = py_trees.common.Status.RUNNING
                 yield self
@@ -91,7 +98,7 @@ class Retry(py_trees.decorators.Decorator):
             if self._attempts < self._max_attempts:
                 if self._delay > 0.0:
                     self._waiting = True
-                    self._wait_start = time.time()
+                    self._wait_start = self._clock.time()
                 else:
                     self.decorated.stop(py_trees.common.Status.INVALID)
                 return py_trees.common.Status.RUNNING

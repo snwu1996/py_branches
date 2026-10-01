@@ -29,12 +29,15 @@ pip install -e .
 |---|---|
 | [`alternating`](https://py-branches.readthedocs.io/en/latest/alternating.html) | Cycle through behaviors in fixed patterns, or run a child every N ticks |
 | [`blackboard`](https://py-branches.readthedocs.io/en/latest/blackboard.html) | Read, write, and gate execution on py_trees blackboard variables |
+| [`clock`](https://py-branches.readthedocs.io/en/latest/clock.html) | Injectable time sources, so timed behaviors are testable |
 | [`cooldown`](https://py-branches.readthedocs.io/en/latest/cooldown.html) | Enforce a minimum time gap between runs of a child |
 | [`counter`](https://py-branches.readthedocs.io/en/latest/counter.html) | Cap the total number of times a child runs |
 | [`latch`](https://py-branches.readthedocs.io/en/latest/latch.html) | Make a child's first SUCCESS permanent |
 | [`pause`](https://py-branches.readthedocs.io/en/latest/pause.html) | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | [`random`](https://py-branches.readthedocs.io/en/latest/random.html) | Probabilistic execution and weighted random selection |
 | [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child that fails, optionally with a delay |
+| [`runtime`](https://py-branches.readthedocs.io/en/latest/runtime.html) | Run a tree as a process — rate, signals, exit codes, teardown |
+| [`surgery`](https://py-branches.readthedocs.io/en/latest/surgery.html) | Edit a built tree — walk, find, replace, prune, graft, reset |
 | [`timeout`](https://py-branches.readthedocs.io/en/latest/timeout.html) | Fail a child that stays RUNNING too long |
 | [`visitors`](https://py-branches.readthedocs.io/en/latest/visitors.html) | Log status transitions and time spent RUNNING |
 
@@ -170,6 +173,26 @@ retried = Retry(child, name="Retry", max_attempts=3, delay=0.5)
 bounded = Timeout(child, name="Timeout", duration=2.0)
 ```
 
+### Surgery — edit a tree after it is built
+
+```python
+from py_branches import surgery
+from py_branches.pause import PauseUniform, PauseUntilKey
+
+# Replace every real pause with "press space to continue", including the ones
+# hiding under decorators - a plain isinstance(node, Composite) walk misses
+# those, because a py_trees Decorator is not a Composite.
+swapped = surgery.swap_type(
+    tree.root,
+    (PauseUniform,),
+    lambda old: PauseUntilKey(name=old.name, key="space"),
+)
+
+surgery.find_by_name(tree.root, "random_break_pause")
+surgery.replace(old_node, new_node)  # re-parents, and fixes decorator.decorated
+surgery.reset_subtree(tree.root)  # re-arm every Latch and Counter
+```
+
 ### Visitors — see what the tree actually did
 
 ```python
@@ -180,6 +203,25 @@ tree = py_trees.trees.BehaviourTree(root=child)
 # Log a line only when a leaf changes status, and time every RUNNING stretch
 tree.visitors.append(StatusTransitionVisitor())
 tree.visitors.append(TimerVisitor())
+```
+
+### Clock — test timing without sleeping
+
+Every behavior that measures elapsed time takes a keyword-only `clock`. It
+defaults to the real one, so production trees need not pass it; tests hand it a
+`ManualClock` and step time forward instead of waiting.
+
+```python
+from py_branches.clock import ManualClock
+from py_branches.cooldown import Cooldown
+
+clock = ManualClock()
+cooled = Cooldown(child, name="Cooldown", duration=5.0, clock=clock)
+
+cooled.tick_once()  # runs
+cooled.tick_once()  # cooling, child not ticked
+clock.advance(5.0)  # no real time passes
+cooled.tick_once()  # re-armed, exactly on the boundary
 ```
 
 ## Running Tests

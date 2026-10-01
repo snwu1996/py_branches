@@ -6,6 +6,7 @@ import time
 
 import py_trees
 
+from py_branches.clock import ManualClock
 from py_branches.pause import PauseUniform
 from py_branches.visitors import TimerVisitor
 
@@ -86,3 +87,39 @@ def test_timer_visitor_integrates_with_behaviour_tree(caplog):
     duration = _extract_duration(caplog, "pause")
     assert duration is not None
     assert 0.05 < duration < 0.35, f"duration={duration}"
+
+
+def test_timer_visitor_measures_exact_duration_on_manual_clock(caplog):
+    """No tolerance window needed: the logged duration is the clock's delta."""
+    clock = ManualClock()
+    visitor = TimerVisitor(clock=clock)
+    behaviour = py_trees.behaviours.Running(name="running")
+
+    behaviour.tick_once()
+    visitor.run(behaviour)  # first RUNNING sighting starts the timer
+
+    clock.advance(12.5)
+    behaviour.stop(py_trees.common.Status.SUCCESS)
+
+    with caplog.at_level(logging.INFO):
+        visitor.run(behaviour)
+
+    assert _extract_duration(caplog, "running") == 12.5
+
+
+def test_timer_visitor_accumulates_across_ticks_on_manual_clock(caplog):
+    """The duration spans every RUNNING tick, not just the last gap."""
+    clock = ManualClock()
+    visitor = TimerVisitor(clock=clock)
+    behaviour = py_trees.behaviours.Running(name="running")
+
+    for _ in range(4):
+        behaviour.tick_once()
+        visitor.run(behaviour)
+        clock.advance(0.25)
+
+    behaviour.stop(py_trees.common.Status.SUCCESS)
+    with caplog.at_level(logging.INFO):
+        visitor.run(behaviour)
+
+    assert _extract_duration(caplog, "running") == 1.0

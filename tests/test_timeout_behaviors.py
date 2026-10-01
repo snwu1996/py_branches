@@ -4,6 +4,7 @@ import time
 
 import py_trees
 
+from py_branches.clock import ManualClock
 from py_branches.timeout import Timeout
 
 _r = py_trees.common.Status.RUNNING
@@ -105,3 +106,46 @@ def test_timeout_resets_on_reinitialise():
 
     timeout.tick_once()
     assert timeout.status == _r  # still RUNNING, well within 10s
+
+
+def test_timeout_fires_exactly_at_duration_on_manual_clock():
+    """Not a tick before the duration, and FAILURE on the tick it is reached."""
+    child = py_trees.behaviours.Running(name="running")
+    clock = ManualClock()
+    guarded = Timeout(child, name="timeout", duration=5.0, clock=clock)
+
+    guarded.tick_once()
+    assert guarded.status == _r
+
+    clock.advance(4.999)
+    guarded.tick_once()
+    assert guarded.status == _r
+    assert child.status == _r
+
+    clock.advance(0.001)
+    guarded.tick_once()
+    assert guarded.status == _f
+    assert child.status == _i  # stopped, not left dangling
+
+
+def test_timeout_bounds_one_running_stretch_not_total_on_manual_clock():
+    """The clock restarts in initialise(), so a fresh entry gets a full budget."""
+    child = py_trees.behaviours.Running(name="running")
+    clock = ManualClock()
+    guarded = Timeout(child, name="timeout", duration=5.0, clock=clock)
+
+    guarded.tick_once()
+    clock.advance(4.0)
+    guarded.tick_once()
+    assert guarded.status == _r
+
+    # Fresh entry: the 4 seconds already spent do not carry over.
+    guarded.stop(py_trees.common.Status.INVALID)
+    guarded.tick_once()
+    clock.advance(4.0)
+    guarded.tick_once()
+    assert guarded.status == _r
+
+    clock.advance(1.0)
+    guarded.tick_once()
+    assert guarded.status == _f

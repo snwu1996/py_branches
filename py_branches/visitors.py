@@ -17,10 +17,12 @@ change the tree's shape:
 """
 
 import logging
-import time
 import uuid
 
 import py_trees
+
+from .clock import Clock
+from .clock import default_clock
 
 _ANSI_RESET = "\033[0m"
 _ANSI_BY_STATUS = {
@@ -69,25 +71,35 @@ class TimerVisitor(py_trees.visitors.VisitorBase):
     Measures the duration from when a behaviour first ticks RUNNING until it
     transitions out (SUCCESS, FAILURE, or INVALID). Keyed by behaviour id so
     duplicate names in a tree are handled correctly.
+
+    Args:
+        level (int): Logging level for the duration lines. Default
+            :data:`logging.INFO`.
+        clock (Clock): Time source for the measurement, keyword-only. Defaults
+            to the real clock; pass a :class:`py_branches.clock.ManualClock` to
+            control it in tests.
     """
 
     def __init__(
         self,
         level: int = logging.INFO,
+        *,
+        clock: Clock | None = None,
     ) -> None:
         super().__init__(full=False)
         self._running_starts: dict[uuid.UUID, float] = {}
         self._logger = logging.getLogger(__name__)
         self._level = level
+        self._clock = clock if clock is not None else default_clock()
 
     def run(self, behaviour: py_trees.behaviour.Behaviour) -> None:
         is_running = behaviour.status == py_trees.common.Status.RUNNING
 
         if is_running and behaviour.id not in self._running_starts:
-            self._running_starts[behaviour.id] = time.time()
+            self._running_starts[behaviour.id] = self._clock.time()
         elif not is_running and behaviour.id in self._running_starts:
             start = self._running_starts.pop(behaviour.id)
-            duration = time.time() - start
+            duration = self._clock.time() - start
             self._logger.log(
                 self._level, f"[timer] {behaviour.name} ran for {duration:.3f}s"
             )

@@ -145,6 +145,7 @@ graphviz_output_format = "svg"
 doctest_global_setup = """
 import py_trees
 
+from py_branches import surgery
 from py_branches.alternating import ActivateBehavior
 from py_branches.alternating import RunEveryRange
 from py_branches.alternating import RunEveryX
@@ -155,6 +156,9 @@ from py_branches.blackboard import RunIfBlackboardVariableEquals
 from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
 from py_branches.blackboard import RunIfBlackboardVariableLessThan
 from py_branches.blackboard import SetBlackboardVariableIfCondition
+from py_branches.clock import ManualClock
+from py_branches.clock import SystemClock
+from py_branches.clock import default_clock
 from py_branches.cooldown import Cooldown
 from py_branches.counter import Counter
 from py_branches.latch import Latch
@@ -166,6 +170,11 @@ from py_branches.random import RandomDelay
 from py_branches.random import RandomRun
 from py_branches.random import random_selector
 from py_branches.retry import Retry
+from py_branches.runtime import ExitBehavior
+from py_branches.runtime import RaiseBehavior
+from py_branches.runtime import RequestShutdown
+from py_branches.runtime import ShutdownRequest
+from py_branches.runtime import TreeRunner
 from py_branches.timeout import Timeout
 from py_branches.visitors import StatusTransitionVisitor
 from py_branches.visitors import TimerVisitor

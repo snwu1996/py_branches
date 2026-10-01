@@ -4,6 +4,7 @@ import time
 
 import py_trees
 
+from py_branches.clock import ManualClock
 from py_branches.cooldown import Cooldown
 
 _r = py_trees.common.Status.RUNNING
@@ -112,3 +113,54 @@ def test_cooldown_running_then_success_triggers_cooldown():
     cooldown2 = Cooldown(running_child, name="cooldown2", duration=5.0)
     cooldown2.tick_once()
     assert not cooldown2._cooling
+
+
+def test_cooldown_re_arms_exactly_at_duration_on_manual_clock():
+    """The canonical injected-clock case: no sleeping, exact boundary."""
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    cooldown = Cooldown(child, name="cooldown", duration=5.0, clock=clock)
+
+    cooldown.tick_once()
+    assert cooldown.status == _s  # first run
+
+    cooldown.tick_once()
+    assert cooldown.status == _f  # cooling
+
+    # One hair short of the duration is still cooling.
+    clock.advance(4.999)
+    cooldown.tick_once()
+    assert cooldown.status == _f
+
+    # Exactly at the duration it re-arms.
+    clock.advance(0.001)
+    cooldown.tick_once()
+    assert cooldown.status == _s
+
+
+def test_cooldown_timer_starts_at_completion_not_entry_on_manual_clock():
+    """A RUNNING child is not rate-limited; the gap is measured from the end."""
+    child = py_trees.behaviours.StatusQueue(
+        name="running_then_success",
+        queue=[_r, _r, _s],
+        eventually=_s,
+    )
+    clock = ManualClock()
+    cooldown = Cooldown(child, name="cooldown", duration=5.0, clock=clock)
+
+    # Two RUNNING ticks, with clock time passing: no cooldown engaged yet.
+    cooldown.tick_once()
+    clock.advance(10.0)
+    cooldown.tick_once()
+    assert cooldown.status == _r
+    assert not cooldown._cooling
+
+    # The completing tick is what starts the timer.
+    cooldown.tick_once()
+    assert cooldown.status == _s
+    assert cooldown._cooling
+
+    # So the 10 seconds spent RUNNING do not count toward the gap.
+    clock.advance(4.999)
+    cooldown.tick_once()
+    assert cooldown.status == _f

@@ -7,6 +7,7 @@ import numpy as np
 import py_trees
 import pytest
 
+from py_branches.clock import ManualClock
 from py_branches.pause import PausePDF
 from py_branches.pause import PauseSchedule
 from py_branches.pause import PauseUniform
@@ -38,27 +39,34 @@ def _write_floats(path, values):
 
 def test_pause_uniform():
     random.seed(0)
-    pause_uniform = PauseUniform("pause_uniform", 0.2, 0.5)
-    start_ts = time.time()
-    while True:
-        pause_uniform.tick_once()
-        if pause_uniform.status == py_trees.common.Status.SUCCESS:
-            break
-        time.sleep(0.01)
-    end_ts = time.time()
-    t_elapse = end_ts - start_ts
-    assert 0.2 < t_elapse < 0.5
+    clock = ManualClock()
+    pause_uniform = PauseUniform("pause_uniform", 0.2, 0.5, clock=clock)
+
+    pause_uniform.tick_once()
+    assert pause_uniform.status == py_trees.common.Status.RUNNING
+    sampled = pause_uniform._pause_t
+    assert 0.2 < sampled < 0.5
+
+    # One hair short of the sampled duration: still RUNNING.
+    clock.advance(sampled - 0.001)
+    pause_uniform.tick_once()
+    assert pause_uniform.status == py_trees.common.Status.RUNNING
+
+    # Once it elapses: SUCCESS, on the exact boundary rather than a poll loop.
+    clock.advance(0.001)
+    pause_uniform.tick_once()
+    assert pause_uniform.status == py_trees.common.Status.SUCCESS
 
 
 def test_pause_schedule_pauses_at_scheduled_time():
-    # Whole-second boundary: datetime_time_to_sec truncates microseconds, so a
-    # schedule built from a sub-second timestamp makes t_wait off by up to a
-    # second depending on when the test happened to start.
-    now_dt = datetime.datetime.now().replace(microsecond=0)
-    start_dt = now_dt + datetime.timedelta(seconds=3)
-    stop_dt = now_dt + datetime.timedelta(seconds=6)
-    start_t = start_dt.time()
-    stop_t = stop_dt.time()
+    # A whole-second base time: datetime_time_to_sec truncates microseconds, so
+    # a schedule built off a sub-second timestamp would make t_wait off by up
+    # to a second. On a ManualClock that is chosen rather than hoped for.
+    base_dt = datetime.datetime.combine(datetime.date.today(), datetime.time(12, 0, 0))
+    clock = ManualClock(start=base_dt.timestamp())
+
+    start_t = (base_dt + datetime.timedelta(seconds=3)).time()
+    stop_t = (base_dt + datetime.timedelta(seconds=6)).time()
 
     schedule = [
         {
@@ -70,32 +78,37 @@ def test_pause_schedule_pauses_at_scheduled_time():
         }
     ]
 
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     # Before the scheduled window, should immediately succeed (not pause).
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
-    # Wait until we are inside the scheduled window, then tick.
-    sleep_until_window = (start_dt - datetime.datetime.now()).total_seconds() + 0.05
-    if sleep_until_window > 0:
-        time.sleep(sleep_until_window)
-
+    # Step into the scheduled window, then tick.
+    clock.advance(3.05)
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.RUNNING
-    pause_start_ts = time.time()
+    # 12:00:03.05 -> stop at 12:00:06 is 2.95s, and the truncation to whole
+    # seconds makes that exactly the remaining 3s from 12:00:03.
+    assert pause_schedule._t_wait == pytest.approx(3.0)
 
-    # Tick until SUCCESS and confirm the pause lasted ~3 seconds.
-    while pause_schedule.status == py_trees.common.Status.RUNNING:
-        time.sleep(0.05)
-        pause_schedule.tick_once()
-    pause_duration = time.time() - pause_start_ts
+    # Still RUNNING just short of the wait, SUCCESS once it elapses.
+    clock.advance(2.95)
+    pause_schedule.tick_once()
+    assert pause_schedule.status == py_trees.common.Status.RUNNING
+
+    clock.advance(0.05)
+    pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
-    assert 2.5 < pause_duration < 3.5, f"pause_duration={pause_duration}"
 
 
 def test_pause_schedule_rearms_after_window_end():
-    now = datetime.datetime.now().time()
+    clock = ManualClock(
+        start=datetime.datetime.combine(
+            datetime.date.today(), datetime.time(12, 0, 0)
+        ).timestamp()
+    )
+    now = datetime.time(12, 0, 0)
     one_second_ago = (
         datetime.datetime.combine(datetime.date.today(), now)
         - datetime.timedelta(seconds=1)
@@ -123,14 +136,14 @@ def test_pause_schedule_rearms_after_window_end():
         }
     ]
 
-    pause_schedule = PauseSchedule("pause_schedule", schedule)
+    pause_schedule = PauseSchedule("pause_schedule", schedule, clock=clock)
 
     # First tick in active window should pause (RUNNING).
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.RUNNING
 
     # Wait out the window and let it complete.
-    time.sleep(1.2)
+    clock.advance(1.2)
     pause_schedule.tick_once()
     assert pause_schedule.status == py_trees.common.Status.SUCCESS
 
@@ -236,3 +249,31 @@ def test_pause_pdf_empty_file_raises(tmp_path):
     fp.write_text("# only a comment\n\n")
     with pytest.raises(AssertionError):
         PausePDF("pause_pdf", str(fp))
+
+
+def test_pause_pdf_boundary_is_exact_on_manual_clock(tmp_path):
+    """The sampled duration is honoured to the tick, with no real sleeping."""
+    fp = tmp_path / "waits.txt"
+    _write_floats(fp, [0.25] * 30)
+    clock = ManualClock()
+    pause = PausePDF(
+        "pause_pdf",
+        str(fp),
+        kernel_bandwidth=0.01,
+        min_t=0.1,
+        max_t=0.5,
+        clock=clock,
+    )
+
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.RUNNING
+    sampled = pause._pause_t
+    assert 0.1 <= sampled <= 0.5
+
+    clock.advance(sampled - 0.001)
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.RUNNING
+
+    clock.advance(0.001)
+    pause.tick_once()
+    assert pause.status == py_trees.common.Status.SUCCESS

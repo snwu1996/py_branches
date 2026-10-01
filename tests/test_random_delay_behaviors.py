@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+import random
 import time
 
 import py_trees
 
+from py_branches.clock import ManualClock
 from py_branches.random import RandomDelay
 
 _r = py_trees.common.Status.RUNNING
@@ -143,3 +145,48 @@ def test_random_delay_sampled_within_range():
         rd.stop(py_trees.common.Status.INVALID)
         rd.tick_once()  # triggers fresh entry and samples a new delay
         assert low <= rd._delay <= high
+
+
+def test_random_delay_holds_child_until_delay_elapses_on_manual_clock():
+    """The child is not ticked during the delay, and runs on the boundary."""
+    random.seed(0)
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    delayed = RandomDelay(child, name="random_delay", low=0.5, high=2.0, clock=clock)
+
+    delayed.tick_once()
+    assert delayed.status == _r
+    sampled = delayed._delay
+    assert 0.5 <= sampled <= 2.0
+    assert child.status == _i  # never ticked yet
+
+    clock.advance(sampled - 0.001)
+    delayed.tick_once()
+    assert delayed.status == _r
+    assert child.status == _i
+
+    clock.advance(0.001)
+    delayed.tick_once()
+    assert delayed.status == _s
+    assert child.status == _s
+
+
+def test_random_delay_resamples_on_each_entry_on_manual_clock():
+    """Each fresh entry draws its own delay, so runs are independently jittered."""
+    random.seed(1)
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    delayed = RandomDelay(child, name="random_delay", low=0.5, high=2.0, clock=clock)
+
+    sampled = []
+    for _ in range(5):
+        delayed.tick_once()
+        sampled.append(delayed._delay)
+        # A hair past, not exactly onto, the boundary: the clock accumulates
+        # float error across iterations and this test is about resampling.
+        clock.advance(delayed._delay + 0.001)
+        delayed.tick_once()
+        assert delayed.status == _s
+        delayed.stop(py_trees.common.Status.INVALID)
+
+    assert len(set(sampled)) > 1, f"delays not resampled: {sampled}"
