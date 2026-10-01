@@ -132,7 +132,7 @@ In a systemd unit:
 
 ```ini
 [Service]
-ExecStart=/usr/bin/crafting-bot
+ExecStart=/usr/bin/my-tree-runner
 # 0 is clean; 1 is "the tree failed", which we also treat as a clean exit.
 SuccessExitStatus=0 1
 Restart=on-failure
