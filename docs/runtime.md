@@ -46,9 +46,9 @@ and is derived:
 ```python
 from py_branches.runtime import TreeRunner
 
-TreeRunner(tree, rate=20.0)     # 20 Hz — a 0.05 s period
-TreeRunner(tree, rate=0.5)      # one tick every two seconds
-TreeRunner(tree, rate=None)     # free-running: no sleep at all
+TreeRunner(tree, rate=20.0)  # 20 Hz — a 0.05 s period
+TreeRunner(tree, rate=0.5)  # one tick every two seconds
+TreeRunner(tree, rate=None)  # free-running: no sleep at all
 ```
 
 `rate` must be positive and finite, or `None`. The derived period is readable
@@ -168,10 +168,14 @@ the tick returns and leaves at the loop boundary. Nothing is lost.
 import py_trees
 from py_branches.runtime import RequestShutdown
 
-root = py_trees.composites.Sequence(name="Bot", memory=False, children=[
-    build_main_loop(),
-    RequestShutdown(name="all_done", code=0, reason="inventory empty"),
-])
+root = py_trees.composites.Sequence(
+    name="Bot",
+    memory=False,
+    children=[
+        build_main_loop(),
+        RequestShutdown(name="all_done", code=0, reason="inventory empty"),
+    ],
+)
 ```
 
 The blackboard is the transport because it couples nothing. A tree ticked by
@@ -282,9 +286,9 @@ Reading a live tree in a viewer while it free-runs at 20 Hz is miserable.
 Single-ticking is the feature:
 
 ```python
-runner.pause()      # holds at the next loop boundary
-runner.step(1)      # one tick, then back to holding
-runner.resume()     # release
+runner.pause()  # holds at the next loop boundary
+runner.step(1)  # one tick, then back to holding
+runner.resume()  # release
 ```
 
 A held loop sleeps in short slices rather than blocking, so it stays responsive
@@ -301,13 +305,13 @@ def run_tree(tree):
     try:
         while True:
             tree.tick()
-            time.sleep(0.05)          # drifts: the real period is tick + 50 ms
+            time.sleep(0.05)  # drifts: the real period is tick + 50 ms
     except KeyboardInterrupt:
         pass
     finally:
         for visitor in tree.visitors:
             if isinstance(visitor, ZMQVisitor):
-                visitor.close()       # and tree.shutdown() never runs
+                visitor.close()  # and tree.shutdown() never runs
 ```
 
 becomes:
