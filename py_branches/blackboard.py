@@ -13,6 +13,8 @@ Two groups of classes live here:
 * **Writers** — :class:`IncrementBlackboardVariable`,
   :class:`IncrementBlackboardVariableIfCondition` and
   :class:`SetBlackboardVariableIfCondition`.
+* **Readers** — :class:`LogBlackboardVariable`, which logs a formatted message
+  built from one or more variables.
 * **Gates** — :class:`RunIfBlackboardVariableEquals`,
   :class:`RunIfBlackboardVariableLessThan` and
   :class:`RunIfBlackboardVariableGreaterThan`, which decide whether to tick
@@ -59,6 +61,7 @@ Example:
         root.add_children([increment, gate])
 """
 
+import logging
 from typing import Any
 
 import py_trees
@@ -280,6 +283,95 @@ class SetBlackboardVariableIfCondition(py_trees.decorators.Decorator):
             self._blackboard.set(self._variable_name, self._set_to, overwrite=True)
 
         return self.decorated.status
+
+
+class LogBlackboardVariable(py_trees.behaviour.Behaviour):
+    """Log a message built from one or more blackboard variables, as a leaf.
+
+    A tree is instrumented by inserting this node rather than by writing a
+    one-off behavior: it reads the keys it is given, formats them into
+    ``message``, and logs the result. The keys are registered for READ access on
+    construction, and the message is emitted once per tick.
+
+    ``message`` is a :meth:`str.format` template in which every variable is
+    available under its own key name, so ``message="{bb} is the bb variable."``
+    pairs with ``variable_names="bb"``. Values are passed as format arguments
+    and never re-formatted, so a value containing braces is harmless.
+
+    Args:
+        name (str): Name of this behavior node.
+        variable_names (Union[str, list]): Blackboard key, or list of keys, to
+            read. Each is available in ``message`` under its own name.
+        message (str): Format template for the logged line.
+        logger (Optional[Logger]): Keyword-only. Logger to write to. Defaults to
+            this module's logger.
+        level (int): Keyword-only. Level to log at. Default
+            :data:`logging.INFO`.
+
+    Returns:
+        Status: SUCCESS once the message is logged; FAILURE if a variable is
+        missing or holds None, or if ``message`` refers to a placeholder that
+        was not given in ``variable_names``. Both cases log a warning instead.
+
+    Example:
+        .. testcode::
+
+            import py_trees
+            from py_branches.blackboard import LogBlackboardVariable
+
+            client = py_trees.blackboard.Client(name="log_setup")
+            client.register_key("bb", access=py_trees.common.Access.WRITE)
+            client.bb = 42
+
+            log_bb = LogBlackboardVariable(
+                name="LogBB",
+                variable_names="bb",
+                message="{bb} is the bb variable.",
+            )
+    """
+
+    def __init__(
+        self,
+        name: str,
+        variable_names: str | list,
+        message: str,
+        *,
+        logger: logging.Logger | None = None,
+        level: int = logging.INFO,
+    ):
+        super().__init__(name)
+        self._variable_names = (
+            [variable_names]
+            if isinstance(variable_names, str)
+            else list(variable_names)
+        )
+        self._message = message
+        self._log = logger if logger is not None else logging.getLogger(__name__)
+        self._level = level
+        self._blackboard = py_trees.blackboard.Client()
+        for variable_name in self._variable_names:
+            self._blackboard.register_key(
+                key=variable_name, access=py_trees.common.Access.READ
+            )
+
+    def update(self):
+        values = {}
+        for variable_name in self._variable_names:
+            value = _get_and_check(self._blackboard, variable_name, None, self.logger)
+            if value is None:
+                return py_trees.common.Status.FAILURE
+            values[variable_name] = value
+
+        try:
+            self._log.log(self._level, self._message.format(**values))
+        except (KeyError, IndexError, ValueError):
+            self.logger.warning(
+                f"{self.name}: could not format message {self._message!r} "
+                + f"with variables {sorted(values)}."
+            )
+            return py_trees.common.Status.FAILURE
+
+        return py_trees.common.Status.SUCCESS
 
 
 class RunIfBlackboardVariableEquals(py_trees.decorators.Decorator):

@@ -15,6 +15,15 @@ as decorators that pass their child's status through untouched and write as a
 side effect. **Gates** — the three `RunIf...` decorators — read a variable and
 decide whether to tick their child at all.
 
+Sitting apart from both is `LogBlackboardVariable`, a leaf that reads one or
+more keys and logs them through a `str.format` template — `"{bb} is the bb
+variable."` — so a branch can be instrumented by inserting a node instead of
+writing one. It takes a keyword-only `logger` and `level`, like the visitors in
+[visitors](visitors.md). Note that it reports FAILURE when a key is missing
+rather than logging `None`, which keeps a typo in a key name visible instead of
+quietly printing the wrong thing; see [Failures are quiet](#failures-are-quiet)
+for the convention it follows.
+
 ## Seeding a variable first
 
 Every class here registers the key it touches, so you never need to register
