@@ -24,8 +24,9 @@ Which behaviors accept one: :class:`py_branches.cooldown.Cooldown`,
 :class:`py_branches.timeout.Timeout`, :class:`py_branches.retry.Retry`,
 :class:`py_branches.random.RandomDelay`,
 :class:`py_branches.visitors.TimerVisitor`, and the timed pauses
-:class:`py_branches.pause.PauseUniform`, :class:`py_branches.pause.PausePDF`
-and :class:`py_branches.pause.PauseSchedule`.
+:class:`py_branches.pause.PauseUniform`, :class:`py_branches.pause.PauseNormal`,
+:class:`py_branches.pause.PausePDF` and
+:class:`py_branches.pause.PauseSchedule`.
 
 Example:
     .. testcode::
