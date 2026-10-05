@@ -7,7 +7,7 @@ Five leaf behaviors, differing in where the pause duration comes from:
 * :class:`PauseNormal` — a duration drawn from a truncated normal
   distribution, for waits that cluster around a typical value.
 * :class:`PausePDF` — a duration drawn from a kernel density estimate fitted
-  to recorded samples, for pauses that mimic observed timing.
+  to recorded samples, for pauses that follow observed timing.
 * :class:`PauseUntilKey` — no duration at all; waits for a key press.
 * :class:`PauseSchedule` — waits out a wall-clock window loaded from a YAML
   file, for behavior that should idle overnight or over lunch.
@@ -151,9 +151,9 @@ class PauseNormal(_SampledPause):
 
     Note:
         A normal distribution is symmetric, which makes it the right model when
-        durations genuinely cluster around a typical value. Human reaction and
-        dwell times are not symmetric — mostly short with an occasional long
-        tail — so a log-normal distribution usually describes them better.
+        durations genuinely cluster around a typical value. Many measured
+        durations are not symmetric — mostly short with an occasional long
+        tail — and a log-normal distribution usually describes them better.
 
     Args:
         name (str): Name of this behavior node.
@@ -188,7 +188,7 @@ class PauseNormal(_SampledPause):
         .. testcode::
 
             # Pause for about 1.2 seconds, give or take 0.3, never under 0.5.
-            pause = PauseNormal(name="ThinkTime", mean=1.2, sigma=0.3, min_t=0.5)
+            pause = PauseNormal(name="Settle", mean=1.2, sigma=0.3, min_t=0.5)
     """
 
     def __init__(
@@ -279,11 +279,11 @@ class PausePDF(_SampledPause):
     Example:
         .. code-block:: python
 
-            # Draw human-like think times from recorded data, clamped to
+            # Draw durations from recorded timings, clamped to
             # between 1 and 30 seconds.
             pause = PausePDF(
-                name="ThinkTime",
-                filepath="data/think_times.txt",
+                name="RecordedWait",
+                filepath="data/durations.txt",
                 min_t=1.0,
                 max_t=30.0,
             )

@@ -9,7 +9,7 @@ the rest of the tree keeps ticking — none of them block.
 | | Waits for | Use for |
 |---|---|---|
 | `PauseUniform` | A duration drawn between two bounds | General jitter, anything in a range |
-| `PauseNormal` | A duration clustered around a typical value | Think time with a believable spread |
+| `PauseNormal` | A duration clustered around a typical value | Waits with a typical value and some spread |
 | `PausePDF` | A duration drawn from recorded samples | Reproducing observed timing distributions |
 | `PauseUntilKey` | A key press | Operator-gated steps, debugging |
 | `PauseSchedule` | A wall-clock window from a YAML file | Idling overnight, or over lunch |
@@ -22,8 +22,8 @@ scikit-learn — and it only earns that cost when you have real timings to
 reproduce.
 
 One caveat on `PauseNormal`: a normal distribution is symmetric. That fits a
-wait which genuinely clusters around a typical value, but human reaction and
-dwell times are not symmetric — mostly short, with an occasional long tail — so
+wait which genuinely clusters around a typical value, but many measured
+durations are not symmetric — mostly short, with an occasional long tail — and
 a log-normal distribution describes them better.
 
 ## Truncation
@@ -31,9 +31,9 @@ a log-normal distribution describes them better.
 `PauseNormal` and `PausePDF` both draw from a distribution that extends past the
 duration you want, and both handle it the same way: a draw outside
 `[min_t, max_t]` is **rejected and redrawn**, not clamped to the nearest bound.
-Clamping would be simpler, but it piles probability mass exactly on the bounds —
-a pause that lands on precisely 0.000 s a few percent of the time is a tell.
-Rejection keeps the truncated distribution's shape.
+Clamping would be simpler, but it piles probability mass exactly on the bounds,
+so a pause would land on precisely `min_t` a few percent of the time. Rejection
+keeps the truncated distribution's shape.
 
 `PauseNormal`'s `min_t` defaults to `0.0`, so a negative pause is impossible
 however large `sigma` is relative to `mean`.
