@@ -1,8 +1,11 @@
 #!/usr/bin/env python
+import logging
+
 import py_trees
 
 from py_branches.blackboard import IncrementBlackboardVariable
 from py_branches.blackboard import IncrementBlackboardVariableIfCondition
+from py_branches.blackboard import LogBlackboardVariable
 from py_branches.blackboard import RunIfBlackboardVariableEquals
 from py_branches.blackboard import RunIfBlackboardVariableGreaterThan
 from py_branches.blackboard import RunIfBlackboardVariableLessThan
@@ -40,6 +43,20 @@ def test_increment_blackboard_variable():
     assert blackboard.exists("foo")
     assert blackboard.foo == 2
     assert increment_foo.status == py_trees.common.Status.SUCCESS
+
+
+def test_increment_blackboard_variable_logs_change(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="counter", access=py_trees.common.Access.WRITE)
+    blackboard.counter = 2
+
+    increment = IncrementBlackboardVariable(
+        name="Increment Counter", variable_name="counter", increment_by=1
+    )
+    with caplog.at_level(logging.DEBUG, logger="py_branches.blackboard"):
+        increment.tick_once()
+
+    assert caplog.messages == ["Increment Counter: counter 2 -> 3"]
 
 
 def test_increment_blackboard_variable_invalid_value_fails_safely():
@@ -284,3 +301,107 @@ def test_run_if_blackboard_variable_greater_than():
     # Missing variable, skip with success.
     ribgt = _create_ribgt(count, "missing_gt_var", 0.0, True)
     _tick_and_check_status(ribgt, [_s, _s])
+
+
+def test_log_blackboard_variable_single_variable(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="log_bb", access=py_trees.common.Access.WRITE)
+    blackboard.log_bb = 42
+
+    log_bb = LogBlackboardVariable(
+        name="Log BB",
+        variable_names="log_bb",
+        message="{log_bb} is the bb variable.",
+    )
+    with caplog.at_level(logging.INFO, logger="py_branches.blackboard"):
+        log_bb.tick_once()
+
+    assert log_bb.status == _s
+    assert "42 is the bb variable." in caplog.messages
+
+
+def test_log_blackboard_variable_multiple_variables(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="log_mode", access=py_trees.common.Access.WRITE)
+    blackboard.register_key(key="log_score", access=py_trees.common.Access.WRITE)
+    blackboard.log_mode = "fast"
+    blackboard.log_score = 7
+
+    log_both = LogBlackboardVariable(
+        name="Log Both",
+        variable_names=["log_mode", "log_score"],
+        message="mode={log_mode} score={log_score}",
+    )
+    with caplog.at_level(logging.INFO, logger="py_branches.blackboard"):
+        log_both.tick_once()
+
+    assert log_both.status == _s
+    assert "mode=fast score=7" in caplog.messages
+
+
+def test_log_blackboard_variable_value_with_braces_is_not_reformatted(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="log_braces", access=py_trees.common.Access.WRITE)
+    blackboard.log_braces = "{not_a_key}"
+
+    log_braces = LogBlackboardVariable(
+        name="Log Braces",
+        variable_names="log_braces",
+        message="value is {log_braces}",
+    )
+    with caplog.at_level(logging.INFO, logger="py_branches.blackboard"):
+        log_braces.tick_once()
+
+    assert log_braces.status == _s
+    assert "value is {not_a_key}" in caplog.messages
+
+
+def test_log_blackboard_variable_missing_variable_fails_safely(caplog):
+    log_missing = LogBlackboardVariable(
+        name="Log Missing",
+        variable_names="log_missing_var",
+        message="{log_missing_var} should never be logged.",
+    )
+    with caplog.at_level(logging.INFO, logger="py_branches.blackboard"):
+        log_missing.tick_once()
+
+    assert log_missing.status == _f
+    assert not any("should never be logged" in message for message in caplog.messages)
+
+
+def test_log_blackboard_variable_unknown_placeholder_fails_safely():
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="log_known", access=py_trees.common.Access.WRITE)
+    blackboard.log_known = 1
+
+    log_bad_template = LogBlackboardVariable(
+        name="Log Bad Template",
+        variable_names="log_known",
+        message="{log_known} and {log_unknown}",
+    )
+    log_bad_template.tick_once()
+
+    assert log_bad_template.status == _f
+
+
+def test_log_blackboard_variable_honours_logger_and_level(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="log_custom", access=py_trees.common.Access.WRITE)
+    blackboard.log_custom = "here"
+
+    custom_logger = logging.getLogger("test_log_blackboard_variable_custom")
+    log_custom = LogBlackboardVariable(
+        name="Log Custom",
+        variable_names="log_custom",
+        message="custom {log_custom}",
+        logger=custom_logger,
+        level=logging.DEBUG,
+    )
+    with caplog.at_level(logging.DEBUG, logger=custom_logger.name):
+        log_custom.tick_once()
+
+    assert log_custom.status == _s
+    records = [r for r in caplog.records if r.name == custom_logger.name]
+    assert len(records) == 1
+    assert records[0].levelno == logging.DEBUG
+    assert records[0].getMessage() == "custom here"

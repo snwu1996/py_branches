@@ -32,6 +32,8 @@ import py_trees
 from .clock import Clock
 from .clock import default_clock
 
+logger = logging.getLogger(__name__)
+
 
 class RandomRun(py_trees.decorators.Decorator):
     """
@@ -85,7 +87,7 @@ class RandomRun(py_trees.decorators.Decorator):
 
     def tick(self):
         if self._run is None:
-            self._run = random.random() <= self._probability
+            self._run = self._roll()
         if not self._run:
             yield from py_trees.behaviour.Behaviour.tick(self)
         else:
@@ -101,7 +103,20 @@ class RandomRun(py_trees.decorators.Decorator):
                 return py_trees.common.Status.FAILURE
 
     def terminate(self, new_status: py_trees.common.Status) -> None:
-        self._run = random.random() <= self._probability
+        self._run = self._roll()
+
+    def _roll(self) -> bool:
+        """Decide whether the child runs on the next entry."""
+        roll = random.random()
+        run = roll <= self._probability
+        logger.debug(
+            "%s: rolled %.3f vs p=%.3f -> %s",
+            self.name,
+            roll,
+            self._probability,
+            "run" if run else "skip",
+        )
+        return run
 
 
 class RandomDelay(py_trees.decorators.Decorator):
@@ -163,6 +178,7 @@ class RandomDelay(py_trees.decorators.Decorator):
         if self.status != py_trees.common.Status.RUNNING:
             self._delay = random.uniform(self._low, self._high)
             self._start_time = self._clock.time()
+            logger.debug("%s: delaying %.3f s", self.name, self._delay)
             self._waiting = True
 
         if self._waiting and self._start_time is not None:
@@ -251,7 +267,7 @@ def random_selector(
 
         cumulative_prob += raw_prob
 
-    logging.debug(
+    logger.debug(
         f"behaviors->new_probabilities: {[b.name for b in behaviors]}->{new_probabilities}"
     )
 

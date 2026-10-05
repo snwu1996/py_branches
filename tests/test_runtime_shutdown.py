@@ -185,12 +185,12 @@ def test_restart_clears_a_pending_request():
 # -- ExitBehavior -------------------------------------------------------------
 
 
-def test_exit_behavior_is_backwards_compatible_with_osb4():
-    """osb4 builds it as `ExitBehavior(name='exit_bot')` and ticks it."""
-    node = ExitBehavior(name="exit_bot")
+def test_exit_behavior_is_backwards_compatible_with_legacy_callers():
+    """Existing callers build it as `ExitBehavior(name='exit_worker')` and tick it."""
+    node = ExitBehavior(name="exit_worker")
     node.tick_once()
     assert node.status == STATUS.SUCCESS
-    assert pending() == ShutdownRequest(code=0, reason="", requested_by="exit_bot")
+    assert pending() == ShutdownRequest(code=0, reason="", requested_by="exit_worker")
 
 
 def test_exit_behavior_defaults_its_name():

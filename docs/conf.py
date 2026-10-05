@@ -162,6 +162,7 @@ from py_branches.clock import default_clock
 from py_branches.cooldown import Cooldown
 from py_branches.counter import Counter
 from py_branches.latch import Latch
+from py_branches.pause import PauseNormal
 from py_branches.pause import PauseSchedule
 from py_branches.pause import PauseUniform
 from py_branches.pause import PauseUntilKey

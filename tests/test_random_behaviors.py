@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
+import logging
 import random
 
 random.seed(0)
 import py_trees
 
+from py_branches.clock import ManualClock
+from py_branches.random import RandomDelay
 from py_branches.random import RandomRun
 from py_branches.random import random_selector
 
@@ -146,3 +149,31 @@ def test_random_selector_locks_branch_while_running():
             f"seed={seed}: exactly one branch should run per selection cycle, "
             f"but first._ticked={first._ticked} second._ticked={second._ticked}"
         )
+
+
+def test_random_run_logs_roll(caplog, monkeypatch):
+    monkeypatch.setattr(random, "random", lambda: 0.75)
+    random_run = RandomRun(
+        py_trees.behaviours.Success(name="child"), "maybe", 0.5, success_if_skip=True
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="py_branches.random"):
+        random_run.tick_once()
+
+    assert caplog.messages[0] == "maybe: rolled 0.750 vs p=0.500 -> skip"
+
+
+def test_random_delay_logs_delay(caplog, monkeypatch):
+    monkeypatch.setattr(random, "uniform", lambda low, high: 1.5)
+    delay = RandomDelay(
+        py_trees.behaviours.Success(name="child"),
+        name="delay",
+        low=1.0,
+        high=2.0,
+        clock=ManualClock(),
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="py_branches.random"):
+        delay.tick_once()
+
+    assert caplog.messages == ["delay: delaying 1.500 s"]

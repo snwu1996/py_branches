@@ -66,13 +66,26 @@ period there is nothing left to overrun.
 
 A tick that takes longer than the period increments `runner.overruns` and logs a
 rate-limited WARNING. The next tick then starts immediately — the loop does
-**not** fire a burst of catch-up ticks to get back on schedule. In an RPA tree a
-catch-up burst means a burst of clicks, which is exactly the wrong response to
-being behind.
+**not** fire a burst of catch-up ticks to get back on schedule. A tree whose
+leaves act on the outside world would repeat those actions back to back, which
+is exactly the wrong response to being behind.
 
 `runner.overruns` after a run is the useful number: a tree that overruns most
 ticks is not running at the rate you configured, whatever the configuration
 says.
+
+Some trees overrun by design — one with a blocking leaf, or a rate set low on
+purpose — and there the warning is noise. `warn_on_overrun=False` silences the
+log without touching the accounting:
+
+```python
+runner = TreeRunner(tree, rate=20.0, warn_on_overrun=False)
+runner.run()
+print(runner.overruns)  # still counted
+```
+
+Reach for it once you know why the tree overruns, not to quiet a tree you have
+not explained yet.
 
 ## Stopping
 
@@ -169,11 +182,11 @@ import py_trees
 from py_branches.runtime import RequestShutdown
 
 root = py_trees.composites.Sequence(
-    name="Bot",
+    name="Worker",
     memory=False,
     children=[
         build_main_loop(),
-        RequestShutdown(name="all_done", code=0, reason="inventory empty"),
+        RequestShutdown(name="all_done", code=0, reason="queue empty"),
     ],
 )
 ```
@@ -199,7 +212,7 @@ A `RequestShutdown` with a shorter name and a default of `"exit"`:
 ```python
 from py_branches.runtime import ExitBehavior
 
-quit_cleanly = ExitBehavior(name="exit_bot", code=0)
+quit_cleanly = ExitBehavior(name="exit_worker", code=0)
 ```
 
 `ExitBehavior(immediate=True)` raises the `ShutdownRequest` instead of filing

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import logging
 import signal
 import threading
 import time
@@ -248,6 +249,40 @@ def test_overrun_counted_not_compensated():
     # Every sleep is zero: the loop runs as fast as it can and never fires
     # extra ticks to make up the shortfall.
     assert clock.sleeps == [0.0, 0.0, 0.0]
+
+
+def test_overrun_warns_by_default(caplog):
+    clock = RecordingClock()
+    tree = tree_of(SlowBehaviour("slow", clock, duration=0.15))
+    runner = TreeRunner(tree, rate=20.0, max_ticks=3, signals=(), clock=clock)
+    with caplog.at_level(logging.WARNING, logger="py_branches.runtime"):
+        runner.run()
+
+    assert runner.overruns == 3
+    # Rate-limited, so three overruns inside the interval are one line.
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "over the 0.050s period" in warnings[0].getMessage()
+
+
+def test_warn_on_overrun_false_suppresses_the_warning_but_still_counts(caplog):
+    clock = RecordingClock()
+    tree = tree_of(SlowBehaviour("slow", clock, duration=0.15))
+    runner = TreeRunner(
+        tree,
+        rate=20.0,
+        max_ticks=3,
+        signals=(),
+        warn_on_overrun=False,
+        clock=clock,
+    )
+    with caplog.at_level(logging.WARNING, logger="py_branches.runtime"):
+        runner.run()
+
+    assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+    # Suppressing the log must not hide the overrun from the caller.
+    assert runner.overruns == 3
+    assert runner.ticks == 3
 
 
 def test_unpaced_runner_never_sleeps_and_counts_no_overruns():
