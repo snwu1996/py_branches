@@ -161,6 +161,11 @@ from py_branches.clock import SystemClock
 from py_branches.clock import default_clock
 from py_branches.cooldown import Cooldown
 from py_branches.counter import Counter
+from py_branches.delay import DelayConstant
+from py_branches.delay import DelayExponentialBackoff
+from py_branches.delay import DelayLinearBackoff
+from py_branches.delay import DelayNormal
+from py_branches.delay import DelayUniform
 from py_branches.latch import Latch
 from py_branches.pause import PauseNormal
 from py_branches.pause import PauseSchedule

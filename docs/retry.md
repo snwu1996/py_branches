@@ -20,6 +20,14 @@ Setting `delay` adds a wall-clock wait between attempts on top of that, during
 which the decorator stays RUNNING without ticking the child. Use it when the
 thing you are retrying needs recovery time rather than just another go.
 
+## Random and growing delays
+
+`delay` takes a number of seconds or any {doc}`delay` object, on all three
+decorators. The delay is sampled once before each re-run with the number of
+runs finished so far, so `DelayExponentialBackoff` waits longer after each
+failure and `DelayUniform` draws a fresh wait for each gap. Because the run count
+resets on entry, so does the backoff.
+
 ## The budget resets on entry
 
 Unlike {doc}`counter` and {doc}`latch`, `Retry` clears its attempt counter in

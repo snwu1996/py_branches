@@ -29,6 +29,7 @@ pip install -e .
 | {doc}`clock` | Injectable time sources, so timed behaviors are testable |
 | {doc}`cooldown` | Enforce a minimum time gap between runs of a child |
 | {doc}`counter` | Cap the total number of times a child runs |
+| {doc}`delay` | Waits to pass to behaviors — constant, uniform, normal, or backing off |
 | {doc}`latch` | Make a child's first SUCCESS permanent |
 | {doc}`pause` | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | {doc}`random` | Probabilistic execution and weighted random selection |
@@ -48,7 +49,8 @@ shared variable, {doc}`cooldown` by how long it has been since the last run, and
 {doc}`counter` and {doc}`latch` by whether it has already run enough times.
 
 **How long may it take?** {doc}`timeout` bounds a single run; {doc}`retry`
-handles the case where the answer is "take another go".
+handles the case where the answer is "take another go", and {doc}`delay` decides
+how long to wait before each go.
 
 **How do I see what happened?** {doc}`visitors` — attached to the tree rather
 than placed in it, so they observe without altering control flow.
@@ -91,6 +93,7 @@ blackboard
 clock
 cooldown
 counter
+delay
 latch
 pause
 random

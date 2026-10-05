@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
+import random
 import time
 
 import py_trees
 import pytest
 
 from py_branches.clock import ManualClock
+from py_branches.delay import DelayConstant
+from py_branches.delay import DelayExponentialBackoff
+from py_branches.delay import DelayUniform
 from py_branches.retry import Retry
 from py_branches.retry import RunUntilFailed
 from py_branches.retry import RunUntilXSuccesses
@@ -570,3 +574,148 @@ def test_run_until_x_successes_with_one_success_matches_retry(script):
         loop.tick_once()
         oracle.tick_once()
         assert loop.status == oracle.status
+
+
+class CountingDelay:
+    """A Delay that records every run it is sampled with."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+        self.runs = []
+
+    def sample(self, run):
+        self.runs.append(run)
+        return self.seconds
+
+
+def _ticks_until_child_reruns(decorator, child, clock, step=0.25, limit=100):
+    """Advance the clock in steps until the child is ticked again; return the wait."""
+    before = child._call_count
+    waited = 0.0
+    for _ in range(limit):
+        clock.advance(step)
+        waited += step
+        decorator.tick_once()
+        if child._call_count != before:
+            return waited
+    raise AssertionError("child never re-ran")
+
+
+def test_retry_exponential_backoff_waits_1_2_4_on_manual_clock():
+    child = ScriptedBehavior("child", [_f])
+    clock = ManualClock()
+    retry = Retry(
+        child,
+        name="retry",
+        max_attempts=4,
+        delay=DelayExponentialBackoff(1.0),
+        clock=clock,
+    )
+
+    retry.tick_once()  # attempt 1 fails
+    waits = [_ticks_until_child_reruns(retry, child, clock) for _ in range(3)]
+    assert waits == [1.0, 2.0, 4.0]
+    assert retry.status == _f
+
+
+def test_retry_backoff_restarts_after_reinitialise():
+    child = ScriptedBehavior("child", [_f])
+    clock = ManualClock()
+    delay = CountingDelay(1.0)
+    retry = Retry(child, name="retry", max_attempts=3, delay=delay, clock=clock)
+
+    retry.tick_once()
+    for _ in range(2):
+        _ticks_until_child_reruns(retry, child, clock)
+    assert retry.status == _f
+    assert delay.runs == [1, 2]
+
+    retry.stop(py_trees.common.Status.INVALID)
+    retry.tick_once()
+    _ticks_until_child_reruns(retry, child, clock)
+    assert delay.runs == [1, 2, 1, 2]
+
+
+def test_retry_samples_once_per_gap_not_per_tick():
+    child = ScriptedBehavior("child", [_f])
+    clock = ManualClock()
+    delay = CountingDelay(1.0)
+    retry = Retry(child, name="retry", max_attempts=2, delay=delay, clock=clock)
+
+    retry.tick_once()
+    for _ in range(3):
+        clock.advance(0.1)
+        retry.tick_once()
+    assert delay.runs == [1]
+
+
+def test_retry_uniform_delay_waits_exactly_the_drawn_value():
+    expected = random.Random(7).uniform(0.5, 1.5)
+    child = ScriptedBehavior("child", [_f])
+    clock = ManualClock()
+    retry = Retry(
+        child,
+        name="retry",
+        max_attempts=2,
+        delay=DelayUniform(0.5, 1.5, rng=random.Random(7)),
+        clock=clock,
+    )
+
+    retry.tick_once()
+    assert retry._wait_t == expected
+
+    clock.advance(expected - 0.001)
+    retry.tick_once()
+    assert child._call_count == 1
+
+    clock.advance(0.001)
+    retry.tick_once()
+    assert child._call_count == 2
+
+
+def test_retry_zero_sampled_delay_does_not_wait():
+    child = ScriptedBehavior("child", [_f, _s])
+    retry = Retry(child, name="retry", max_attempts=2, delay=DelayConstant(0.0))
+
+    retry.tick_once()
+    assert not retry._waiting
+    retry.tick_once()
+    assert retry.status == _s
+
+
+def test_run_until_failed_accepts_a_delay():
+    child = ScriptedBehavior("child", [_s, _s, _f])
+    clock = ManualClock()
+    loop = RunUntilFailed(
+        child,
+        name="loop",
+        max_runs=5,
+        delay=DelayExponentialBackoff(1.0),
+        clock=clock,
+    )
+
+    loop.tick_once()
+    waits = [_ticks_until_child_reruns(loop, child, clock) for _ in range(2)]
+    assert waits == [1.0, 2.0]
+    assert loop.status == _s
+
+
+def test_run_until_x_successes_accepts_a_delay():
+    child = ScriptedBehavior("child", [_s, _f, _s])
+    clock = ManualClock()
+    delay = CountingDelay(0.5)
+    loop = RunUntilXSuccesses(
+        child, name="loop", num_successes=2, max_runs=3, delay=delay, clock=clock
+    )
+
+    loop.tick_once()
+    for _ in range(2):
+        _ticks_until_child_reruns(loop, child, clock)
+    assert loop.status == _s
+    assert delay.runs == [1, 2]
+
+
+def test_rerun_decorators_reject_non_delay_values():
+    child = py_trees.behaviours.Success(name="success")
+    with pytest.raises(TypeError):
+        Retry(child, name="retry", max_attempts=2, delay="1.0")

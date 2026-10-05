@@ -14,6 +14,10 @@ child that sometimes runs, and when it does, not immediately.
 when the weights are the point — a behavior profile, say, where an agent idles
 50% of the time, patrols 30%, and investigates 20%.
 
+`RandomDelay` draws uniformly from `low` and `high` by default. Pass
+`delay=` instead to draw from any {doc}`delay` — a `DelayNormal` for waits that
+cluster around a typical value, for instance.
+
 ## Why the weights are rewritten
 
 `random_selector` does something non-obvious worth understanding before you

@@ -4,8 +4,11 @@ import random
 import time
 
 import py_trees
+import pytest
 
 from py_branches.clock import ManualClock
+from py_branches.delay import DelayConstant
+from py_branches.delay import DelayExponentialBackoff
 from py_branches.random import RandomDelay
 
 _r = py_trees.common.Status.RUNNING
@@ -190,3 +193,47 @@ def test_random_delay_resamples_on_each_entry_on_manual_clock():
         delayed.stop(py_trees.common.Status.INVALID)
 
     assert len(set(sampled)) > 1, f"delays not resampled: {sampled}"
+
+
+def test_random_delay_accepts_a_delay_on_manual_clock():
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    delayed = RandomDelay(
+        child, name="random_delay", delay=DelayConstant(1.0), clock=clock
+    )
+
+    delayed.tick_once()
+    assert delayed.status == _r
+    clock.advance(0.999)
+    delayed.tick_once()
+    assert child.status == _i
+
+    clock.advance(0.001)
+    delayed.tick_once()
+    assert delayed.status == _s
+
+
+def test_random_delay_samples_backoff_with_run_one():
+    child = py_trees.behaviours.Success(name="success")
+    delayed = RandomDelay(
+        child, name="random_delay", delay=DelayExponentialBackoff(0.5)
+    )
+    for _ in range(3):
+        delayed.stop(py_trees.common.Status.INVALID)
+        delayed.tick_once()
+        assert delayed._delay == 0.5
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"low": 0.5},
+        {"low": 0.5, "high": 1.0, "delay": DelayConstant(1.0)},
+        {"high": 1.0, "delay": DelayConstant(1.0)},
+    ],
+)
+def test_random_delay_needs_exactly_one_source(kwargs):
+    child = py_trees.behaviours.Success(name="success")
+    with pytest.raises(ValueError, match="low and high, or delay"):
+        RandomDelay(child, name="random_delay", **kwargs)

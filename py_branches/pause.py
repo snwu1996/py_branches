@@ -38,6 +38,7 @@ from sklearn.neighbors import KernelDensity
 
 from .clock import Clock
 from .clock import default_clock
+from .delay import _truncated_normal
 
 logger = logging.getLogger(__name__)
 
@@ -223,15 +224,14 @@ class PauseNormal(_SampledPause):
         self._rng = rng if rng is not None else random
 
     def _sample(self) -> float:
-        for _ in range(self._max_rejections):
-            t_wait = self._rng.normalvariate(self._mean, self._sigma)
-            if self._min_t <= t_wait <= self._max_t:
-                return t_wait
-        raise ValueError(
-            f"{self.name}: {self._max_rejections} consecutive draws from "
-            + f"normal(mean={self._mean}, sigma={self._sigma}) all fell outside "
-            + f"[min_t({self._min_t}), max_t({self._max_t})]; the distribution "
-            + "and the bounds disagree."
+        return _truncated_normal(
+            self._rng,
+            self._mean,
+            self._sigma,
+            self._min_t,
+            self._max_t,
+            self._max_rejections,
+            self.name,
         )
 
 

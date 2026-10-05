@@ -15,6 +15,8 @@ import py_trees
 
 from .clock import Clock
 from .clock import default_clock
+from .delay import Delay
+from .delay import as_delay
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ class _RunUntilCount(py_trees.decorators.Decorator):
         target_status: py_trees.common.Status,
         target_count: int,
         max_runs: int,
-        delay: float,
+        delay: float | Delay,
         *,
         clock: Clock | None = None,
     ):
@@ -44,23 +46,25 @@ class _RunUntilCount(py_trees.decorators.Decorator):
         self._target_status = target_status
         self._target_count = target_count
         self._max_runs = max_runs
-        self._delay = delay
+        self._delay = as_delay(delay)
         self._clock = clock if clock is not None else default_clock()
         self._attempts = 0
         self._hits = 0
         self._waiting = False
         self._wait_start: float | None = None
+        self._wait_t = 0.0
 
     def initialise(self) -> None:
         self._attempts = 0
         self._hits = 0
         self._waiting = False
         self._wait_start = None
+        self._wait_t = 0.0
 
     def tick(self):
         if self._waiting and self._wait_start is not None:
             elapsed = self._clock.time() - self._wait_start
-            if elapsed < self._delay:
+            if elapsed < self._wait_t:
                 self.status = py_trees.common.Status.RUNNING
                 yield self
                 return
@@ -89,9 +93,12 @@ class _RunUntilCount(py_trees.decorators.Decorator):
             return py_trees.common.Status.SUCCESS
         elif self._attempts == self._max_runs:
             return py_trees.common.Status.FAILURE
-        if self._delay > 0.0:
+        wait = self._delay.sample(self._attempts)
+        if wait > 0.0:
+            logger.debug("%s: waiting %.3f s before the next run", self.name, wait)
             self._waiting = True
             self._wait_start = self._clock.time()
+            self._wait_t = wait
         else:
             self.decorated.stop(py_trees.common.Status.INVALID)
         return py_trees.common.Status.RUNNING
@@ -114,15 +121,16 @@ class Retry(_RunUntilCount):
         name (str): Name of this decorator.
         max_attempts (int): Maximum number of times to attempt the child.
             Must be at least 1.
-        delay (float): Seconds to wait between retry attempts. Must be
-            non-negative. Default 0.0.
+        delay (float | Delay): Wait between retry attempts: seconds, or a
+            :class:`~py_branches.delay.Delay` sampled before each retry.
+            A number must be non-negative. Default 0.0.
         clock (Clock): Time source for the inter-attempt delay, keyword-only.
             Defaults to the real clock; pass a
             :class:`py_branches.clock.ManualClock` to control it in tests.
 
     Raises:
-        ValueError: If ``max_attempts`` is less than 1, or ``delay`` is
-            negative.
+        ValueError: If ``max_attempts`` is less than 1, or ``delay`` is a
+            negative number.
 
     Example:
         .. testcode::
@@ -134,6 +142,17 @@ class Retry(_RunUntilCount):
             child = py_trees.behaviours.Failure(name="Flaky")
             # Try up to 3 times with 1 second between each attempt.
             retry = Retry(child, name="RetryWithDelay", max_attempts=3, delay=1.0)
+
+            from py_branches.delay import DelayExponentialBackoff
+
+            child = py_trees.behaviours.Failure(name="Flaky")
+            # Try up to 5 times, waiting 0.5, 1, 2 and 4 seconds between them.
+            retry = Retry(
+                child,
+                name="RetryWithBackoff",
+                max_attempts=5,
+                delay=DelayExponentialBackoff(0.5),
+            )
     """
 
     def __init__(
@@ -141,14 +160,12 @@ class Retry(_RunUntilCount):
         child: py_trees.behaviour.Behaviour,
         name: str,
         max_attempts: int,
-        delay: float = 0.0,
+        delay: float | Delay = 0.0,
         *,
         clock: Clock | None = None,
     ):
         if max_attempts < 1:
             raise ValueError(f"max_attempts({max_attempts}) must be greater than 0.")
-        if delay < 0.0:
-            raise ValueError(f"delay({delay}) must be non-negative.")
         super().__init__(
             child,
             name,
@@ -179,14 +196,16 @@ class RunUntilFailed(_RunUntilCount):
         name (str): Name of this decorator.
         max_runs (int): Maximum number of times to run the child. Must be at
             least 1.
-        delay (float): Seconds to wait between runs. Must be non-negative.
-            Default 0.0.
+        delay (float | Delay): Wait between runs: seconds, or a
+            :class:`~py_branches.delay.Delay` sampled before each re-run.
+            A number must be non-negative. Default 0.0.
         clock (Clock): Time source for the inter-run delay, keyword-only.
             Defaults to the real clock; pass a
             :class:`py_branches.clock.ManualClock` to control it in tests.
 
     Raises:
-        ValueError: If ``max_runs`` is less than 1, or ``delay`` is negative.
+        ValueError: If ``max_runs`` is less than 1, or ``delay`` is a negative
+            number.
 
     Example:
         .. testcode::
@@ -207,14 +226,12 @@ class RunUntilFailed(_RunUntilCount):
         child: py_trees.behaviour.Behaviour,
         name: str,
         max_runs: int,
-        delay: float = 0.0,
+        delay: float | Delay = 0.0,
         *,
         clock: Clock | None = None,
     ):
         if max_runs < 1:
             raise ValueError(f"max_runs({max_runs}) must be greater than 0.")
-        if delay < 0.0:
-            raise ValueError(f"delay({delay}) must be non-negative.")
         super().__init__(
             child,
             name,
@@ -249,15 +266,16 @@ class RunUntilXSuccesses(_RunUntilCount):
         num_successes (int): Number of successes needed. Must be at least 1.
         max_runs (int): Maximum number of times to run the child. Must be at
             least ``num_successes``.
-        delay (float): Seconds to wait between runs. Must be non-negative.
-            Default 0.0.
+        delay (float | Delay): Wait between runs: seconds, or a
+            :class:`~py_branches.delay.Delay` sampled before each re-run.
+            A number must be non-negative. Default 0.0.
         clock (Clock): Time source for the inter-run delay, keyword-only.
             Defaults to the real clock; pass a
             :class:`py_branches.clock.ManualClock` to control it in tests.
 
     Raises:
         ValueError: If ``num_successes`` is less than 1, ``max_runs`` is less
-            than ``num_successes``, or ``delay`` is negative.
+            than ``num_successes``, or ``delay`` is a negative number.
 
     Example:
         .. testcode::
@@ -285,7 +303,7 @@ class RunUntilXSuccesses(_RunUntilCount):
         name: str,
         num_successes: int,
         max_runs: int,
-        delay: float = 0.0,
+        delay: float | Delay = 0.0,
         *,
         clock: Clock | None = None,
     ):
@@ -295,8 +313,6 @@ class RunUntilXSuccesses(_RunUntilCount):
             raise ValueError(
                 f"max_runs({max_runs}) must be at least num_successes({num_successes})."
             )
-        if delay < 0.0:
-            raise ValueError(f"delay({delay}) must be non-negative.")
         super().__init__(
             child,
             name,

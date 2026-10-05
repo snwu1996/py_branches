@@ -31,6 +31,8 @@ import py_trees
 
 from .clock import Clock
 from .clock import default_clock
+from .delay import Delay
+from .delay import DelayUniform
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +126,8 @@ class RandomDelay(py_trees.decorators.Decorator):
     Waits a random duration before running the child on each fresh entry.
 
     On every fresh entry (i.e. when the decorator was not already RUNNING),
-    a delay is sampled uniformly from ``[low, high]`` seconds.  The decorator
+    a delay is sampled uniformly from ``[low, high]`` seconds, or drawn from
+    ``delay`` when one is given instead.  The decorator
     stays RUNNING without ticking the child until the delay has elapsed, then
     passes through to the child normally.
 
@@ -135,14 +138,20 @@ class RandomDelay(py_trees.decorators.Decorator):
     Args:
         child (Behaviour): The child behavior to delay.
         name (str): Name of this decorator.
-        low (float): Minimum delay in seconds (>= 0).
+        low (float): Minimum delay in seconds (>= 0). Pass with ``high``,
+            or pass ``delay`` instead.
         high (float): Maximum delay in seconds (>= low).
+        delay (Delay): Keyword-only. Any :class:`~py_branches.delay.Delay`,
+            in place of ``low`` and ``high`` — for example a
+            :class:`~py_branches.delay.DelayNormal`. It is sampled once per
+            entry with ``run=1``, so a backoff delay does not grow here.
         clock (Clock): Time source for the delay, keyword-only. Defaults to the
             real clock; pass a :class:`py_branches.clock.ManualClock` to
             control it in tests.
 
     Raises:
-        ValueError: If ``low`` is negative, or greater than ``high``.
+        ValueError: If ``low`` is negative, or greater than ``high``; or if
+            ``delay`` is given together with ``low``/``high``, or neither is.
 
     Example:
         .. testcode::
@@ -150,24 +159,38 @@ class RandomDelay(py_trees.decorators.Decorator):
             child = py_trees.behaviours.Success(name="Action")
             # Pause 0.5-2.0 seconds before running the child each time.
             delayed = RandomDelay(child, name="RandomDelay", low=0.5, high=2.0)
+
+            from py_branches.delay import DelayNormal
+
+            child = py_trees.behaviours.Success(name="Action")
+            # About a second, give or take 0.25, before running the child.
+            delayed = RandomDelay(
+                child, name="NormalDelay", delay=DelayNormal(1.0, 0.25)
+            )
     """
 
     def __init__(
         self,
         child: py_trees.behaviour.Behaviour,
         name: str,
-        low: float,
-        high: float,
+        low: float | None = None,
+        high: float | None = None,
         *,
+        delay: Delay | None = None,
         clock: Clock | None = None,
     ):
-        if low < 0.0:
-            raise ValueError(f"low({low}) must be >= 0.")
-        if low > high:
-            raise ValueError(f"low({low}) must be <= high({high}).")
+        if delay is None:
+            if low is None or high is None:
+                raise ValueError("Pass either low and high, or delay.")
+            if low < 0.0:
+                raise ValueError(f"low({low}) must be >= 0.")
+            if low > high:
+                raise ValueError(f"low({low}) must be <= high({high}).")
+            delay = DelayUniform(low, high)
+        elif low is not None or high is not None:
+            raise ValueError("Pass either low and high, or delay, not both.")
         super().__init__(name=name, child=child)
-        self._low = low
-        self._high = high
+        self._delay_source = delay
         self._clock = clock if clock is not None else default_clock()
         self._delay = 0.0
         self._start_time: float | None = None
@@ -176,7 +199,7 @@ class RandomDelay(py_trees.decorators.Decorator):
     def tick(self):
         # Fresh entry: sample a new delay and start the timer.
         if self.status != py_trees.common.Status.RUNNING:
-            self._delay = random.uniform(self._low, self._high)
+            self._delay = self._delay_source.sample(1)
             self._start_time = self._clock.time()
             logger.debug("%s: delaying %.3f s", self.name, self._delay)
             self._waiting = True
