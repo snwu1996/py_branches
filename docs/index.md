@@ -32,7 +32,7 @@ pip install -e .
 | {doc}`latch` | Make a child's first SUCCESS permanent |
 | {doc}`pause` | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | {doc}`random` | Probabilistic execution and weighted random selection |
-| {doc}`retry` | Re-run a child that fails, optionally with a delay |
+| {doc}`retry` | Re-run a child that fails, or repeat one until it fails |
 | {doc}`runtime` | Run a tree as a process — rate, signals, exit codes, teardown |
 | {doc}`surgery` | Edit a built tree — walk, find, replace, prune, graft, reset |
 | {doc}`timeout` | Fail a child that stays RUNNING too long |

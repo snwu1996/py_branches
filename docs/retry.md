@@ -23,6 +23,23 @@ Unlike {doc}`counter` and {doc}`latch`, `Retry` clears its attempt counter in
 That is almost always what you want from a retry, but it does mean `Retry`
 cannot express "three attempts total, ever" — that is `Counter`'s job.
 
+## Repeating until the child fails
+
+`RunUntilFailed` is `Retry` with the roles swapped: it re-runs its child each
+time the child *succeeds*, and stops at the first FAILURE. Use it for work that
+repeats until the child reports there is nothing left to do — draining a queue,
+paging through results, stepping until a condition no longer holds.
+
+The child's FAILURE is the loop's normal exit, so `RunUntilFailed` reports it as
+SUCCESS. Reaching `max_runs` without a failure means the loop never got to its
+exit condition, and that is reported as FAILURE — the cap is a safety net, not
+an expected outcome, and a parent should be able to tell the two apart. If you
+need the other convention, wrap it in an `Inverter` or use py_trees' own
+`Repeat`.
+
+Everything above applies to it unchanged: runs cost ticks, `delay` waits
+between runs, and the budget of `max_runs` resets on each fresh entry.
+
 ## API
 
 ```{eval-rst}

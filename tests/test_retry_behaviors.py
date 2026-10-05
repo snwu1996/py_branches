@@ -3,9 +3,11 @@
 import time
 
 import py_trees
+import pytest
 
 from py_branches.clock import ManualClock
 from py_branches.retry import Retry
+from py_branches.retry import RunUntilFailed
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
@@ -183,3 +185,179 @@ def test_retry_zero_delay_does_not_wait_on_manual_clock():
     retry.tick_once()
     assert retry.status == _f
     assert clock.time() == 0.0
+
+
+class SucceedNTimesBehavior(py_trees.behaviour.Behaviour):
+    """
+    Returns SUCCESS for the first succeed_count calls to update(), then FAILURE.
+    Does NOT reset on initialise() so the counter persists across runs.
+    """
+
+    def __init__(self, name, succeed_count):
+        super().__init__(name=name)
+        self._succeed_count = succeed_count
+        self._call_count = 0
+
+    def initialise(self):
+        pass  # preserve count across runs
+
+    def update(self):
+        if self._call_count < self._succeed_count:
+            self._call_count += 1
+            return _s
+        return _f
+
+
+def test_run_until_failed_fails_first_run():
+    """Child fails immediately; RunUntilFailed returns SUCCESS on first tick."""
+    child = SucceedNTimesBehavior("child", succeed_count=0)
+    loop = RunUntilFailed(child, name="loop", max_runs=3)
+
+    loop.tick_once()
+    assert loop.status == _s
+
+
+def test_run_until_failed_succeeds_then_fails():
+    """Child succeeds twice then fails; RunUntilFailed returns SUCCESS."""
+    child = SucceedNTimesBehavior("child", succeed_count=2)
+    loop = RunUntilFailed(child, name="loop", max_runs=5)
+
+    loop.tick_once()
+    assert loop.status == _r  # run 1 succeeded
+
+    loop.tick_once()
+    assert loop.status == _r  # run 2 succeeded
+
+    loop.tick_once()
+    assert loop.status == _s  # run 3 failed, loop done
+
+
+def test_run_until_failed_cap_reached():
+    """Child always succeeds; RunUntilFailed returns FAILURE after max_runs."""
+    child = SucceedNTimesBehavior("child", succeed_count=10)
+    loop = RunUntilFailed(child, name="loop", max_runs=3)
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _f
+    assert child._call_count == 3
+
+
+def test_run_until_failed_max_runs_one():
+    """max_runs=1 means a single success returns FAILURE immediately."""
+    child = SucceedNTimesBehavior("child", succeed_count=1)
+    loop = RunUntilFailed(child, name="loop", max_runs=1)
+
+    loop.tick_once()
+    assert loop.status == _f
+
+
+def test_run_until_failed_resets_on_reinitialise():
+    """After hitting the cap, stopping the decorator to INVALID resets the run counter."""
+    child = SucceedNTimesBehavior("child", succeed_count=10)
+    loop = RunUntilFailed(child, name="loop", max_runs=3)
+
+    for _ in range(3):
+        loop.tick_once()
+    assert loop.status == _f
+
+    loop.stop(py_trees.common.Status.INVALID)
+    child._call_count = 0
+    child._succeed_count = 2  # succeed twice then fail
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _s
+
+
+def test_run_until_failed_running_child_passes_through():
+    """If child is RUNNING, RunUntilFailed stays RUNNING without counting a run."""
+    running_child = py_trees.behaviours.Running(name="running")
+    loop = RunUntilFailed(running_child, name="loop", max_runs=3)
+
+    for _ in range(5):
+        loop.tick_once()
+        assert loop.status == _r
+        assert loop._attempts == 0
+
+
+def test_run_until_failed_waits_exactly_delay_between_runs_on_manual_clock():
+    """The child is not re-ticked until the delay has elapsed."""
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    loop = RunUntilFailed(child, name="loop", max_runs=2, delay=1.0, clock=clock)
+
+    loop.tick_once()
+    assert loop.status == _r
+    assert loop._waiting
+    assert loop._attempts == 1
+
+    clock.advance(0.999)
+    loop.tick_once()
+    assert loop.status == _r
+    assert loop._attempts == 1
+
+    clock.advance(0.001)
+    loop.tick_once()
+    assert loop.status == _f
+    assert loop._attempts == 2
+
+
+def test_run_until_failed_zero_delay_does_not_wait_on_manual_clock():
+    """delay=0.0 runs back-to-back, no timer."""
+    child = py_trees.behaviours.Success(name="success")
+    clock = ManualClock()
+    loop = RunUntilFailed(child, name="loop", max_runs=3, clock=clock)
+
+    loop.tick_once()
+    assert loop.status == _r
+    assert not loop._waiting
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _f
+    assert clock.time() == 0.0
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"max_runs": 0}, r"max_runs\(0\)"),
+        ({"max_runs": 3, "delay": -1.0}, r"delay\(-1.0\)"),
+    ],
+)
+def test_run_until_failed_rejects_invalid_arguments(kwargs, message):
+    child = py_trees.behaviours.Success(name="success")
+    with pytest.raises(ValueError, match=message):
+        RunUntilFailed(child, name="loop", **kwargs)
+
+
+@pytest.mark.parametrize("succeed_count", [0, 1, 2, 3, 4, 10])
+def test_run_until_failed_matches_retry_of_inverted_child(succeed_count):
+    """RunUntilFailed is Retry(Inverter(child)) under another name."""
+    child = SucceedNTimesBehavior("child", succeed_count=succeed_count)
+    loop = RunUntilFailed(child, name="loop", max_runs=4)
+
+    oracle_child = SucceedNTimesBehavior("oracle_child", succeed_count=succeed_count)
+    oracle = Retry(
+        py_trees.decorators.Inverter(name="invert", child=oracle_child),
+        name="oracle",
+        max_attempts=4,
+    )
+
+    for _ in range(6):
+        loop.tick_once()
+        oracle.tick_once()
+        assert loop.status == oracle.status
