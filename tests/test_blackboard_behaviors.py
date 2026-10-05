@@ -45,6 +45,20 @@ def test_increment_blackboard_variable():
     assert increment_foo.status == py_trees.common.Status.SUCCESS
 
 
+def test_increment_blackboard_variable_logs_change(caplog):
+    blackboard = py_trees.blackboard.Client()
+    blackboard.register_key(key="counter", access=py_trees.common.Access.WRITE)
+    blackboard.counter = 2
+
+    increment = IncrementBlackboardVariable(
+        name="Increment Counter", variable_name="counter", increment_by=1
+    )
+    with caplog.at_level(logging.DEBUG, logger="py_branches.blackboard"):
+        increment.tick_once()
+
+    assert caplog.messages == ["Increment Counter: counter 2 -> 3"]
+
+
 def test_increment_blackboard_variable_invalid_value_fails_safely():
     blackboard = py_trees.blackboard.Client()
     blackboard.register_key(key="missing_var", access=py_trees.common.Access.WRITE)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import logging
 import math
 import random
 import time
@@ -58,6 +59,16 @@ def test_pause_uniform():
     clock.advance(0.001)
     pause_uniform.tick_once()
     assert pause_uniform.status == py_trees.common.Status.SUCCESS
+
+
+def test_pause_uniform_logs_duration(caplog):
+    pause_uniform = PauseUniform("pause_uniform", 0.2, 0.5, clock=ManualClock())
+
+    with caplog.at_level(logging.DEBUG, logger="py_branches.pause"):
+        pause_uniform.tick_once()
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages == [f"pause_uniform: pausing {pause_uniform._pause_t:.3f} s"]
 
 
 def test_pause_schedule_pauses_at_scheduled_time():

@@ -66,6 +66,8 @@ from typing import Any
 
 import py_trees
 
+logger = logging.getLogger(__name__)
+
 
 def _get_and_check(
     bb: py_trees.blackboard.Client, var: str, types: list | None, logger
@@ -155,7 +157,11 @@ class IncrementBlackboardVariable(py_trees.behaviour.Behaviour):
                 f"Failed to increment blackboard variable {self._variable_name}: value missing or invalid."
             )
             return
-        self._blackboard.set(self._variable_name, current_value + self._increment_by)
+        new_value = current_value + self._increment_by
+        self._blackboard.set(self._variable_name, new_value)
+        logger.debug(
+            "%s: %s %s -> %s", self.name, self._variable_name, current_value, new_value
+        )
         self._return_sucess = True
 
     def update(self):

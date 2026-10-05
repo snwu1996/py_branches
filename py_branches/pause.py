@@ -29,6 +29,7 @@ import logging
 import math
 import os
 import random
+import time
 
 import numpy as np
 import py_trees
@@ -37,6 +38,8 @@ from sklearn.neighbors import KernelDensity
 
 from .clock import Clock
 from .clock import default_clock
+
+logger = logging.getLogger(__name__)
 
 HOUR2SEC = 3600
 MIN2SEC = 60
@@ -83,6 +86,7 @@ class _SampledPause(py_trees.behaviour.Behaviour):
     def initialise(self):
         self._pause_t = self._sample()
         self._start_t = self._clock.time()
+        logger.debug("%s: pausing %.3f s", self.name, self._pause_t)
 
     def update(self):
         t_elapse = self._clock.time() - self._start_t
@@ -322,7 +326,6 @@ class PausePDF(_SampledPause):
         for _ in range(self._max_rejections):
             t_wait = float(self._model.sample(1)[0][0])  # pyright: ignore
             if self._min_t <= t_wait <= self._max_t:
-                self.logger.debug(f"{self.name} sampled pause {t_wait:.3f} sec")
                 return t_wait
         raise ValueError(
             f"{self.name}: {self._max_rejections} consecutive draws from "
@@ -369,6 +372,7 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
         self._listener_factory = listener_factory
         self._listener = None
         self._pressed = False
+        self._start_t = 0.0
 
     def _matches(self, key) -> bool:
         char = getattr(key, "char", None)
@@ -381,11 +385,19 @@ class PauseUntilKey(py_trees.behaviour.Behaviour):
 
     def _on_press(self, key):
         if self._matches(key):
+            logger.debug(
+                "%s: key %r pressed after %.3f s",
+                self.name,
+                self._key,
+                time.monotonic() - self._start_t,
+            )
             self._pressed = True
             return False
 
     def initialise(self):
         self._pressed = False
+        self._start_t = time.monotonic()
+        logger.debug("%s: waiting for key %r", self.name, self._key)
         if self._listener is not None:
             self._listener.stop()
         self._listener = self._listener_factory(on_press=self._on_press)
@@ -452,7 +464,7 @@ def load_schedule_file(schedule_filepath: str) -> list[dict[str, datetime.time]]
         schedule_raw = yaml.safe_load(schedule_file)
 
     if schedule_raw is None:
-        logging.error(f"Failed to load schedule_file: {schedule_filepath}")
+        logger.error(f"Failed to load schedule_file: {schedule_filepath}")
         return None
 
     schedule = []
@@ -616,10 +628,14 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         # Re-arm once we've left all windows.
         if matched_idx is None:
             self._last_schedule_idx = None
+            logger.debug("%s: outside every window, no pause", self.name)
             return
 
         # Don't re-pause for the same window we already handled.
         if matched_idx == self._last_schedule_idx:
+            logger.debug(
+                "%s: window %d already handled, no pause", self.name, matched_idx
+            )
             return
 
         self._last_schedule_idx = matched_idx
@@ -636,17 +652,17 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
                 + datetime_time_to_sec(stop)
             )
         self._t_start = self._clock.time()
-        logging.info(f"Wait has been scheduled for  {self._t_wait:.3f} sec")
+        logger.info(f"Wait has been scheduled for  {self._t_wait:.3f} sec")
         schedule_element["start_plus_variance_time"] = add_variance_to_datetime_time(
             schedule_element["start_pause_time"], variance
         )
         schedule_element["stop_plus_variance_time"] = add_variance_to_datetime_time(
             schedule_element["stop_pause_time"], variance
         )
-        logging.info(
+        logger.info(
             f"new start_plus_variance_time: {schedule_element['start_plus_variance_time']}"
         )
-        logging.info(
+        logger.info(
             f"new stop_plus_variance_time: {schedule_element['stop_plus_variance_time']}"
         )
 
