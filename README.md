@@ -35,7 +35,7 @@ pip install -e .
 | [`latch`](https://py-branches.readthedocs.io/en/latest/latch.html) | Make a child's first SUCCESS permanent |
 | [`pause`](https://py-branches.readthedocs.io/en/latest/pause.html) | Time-based pauses — random, sampled, keyboard, or YAML-scheduled |
 | [`random`](https://py-branches.readthedocs.io/en/latest/random.html) | Probabilistic execution and weighted random selection |
-| [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child that fails, or repeat one until it fails |
+| [`retry`](https://py-branches.readthedocs.io/en/latest/retry.html) | Re-run a child until it succeeds, fails, or succeeds N times |
 | [`runtime`](https://py-branches.readthedocs.io/en/latest/runtime.html) | Run a tree as a process — rate, signals, exit codes, teardown |
 | [`surgery`](https://py-branches.readthedocs.io/en/latest/surgery.html) | Edit a built tree — walk, find, replace, prune, graft, reset |
 | [`timeout`](https://py-branches.readthedocs.io/en/latest/timeout.html) | Fail a child that stays RUNNING too long |
@@ -169,6 +169,7 @@ latched = Latch(child, name="Latch")
 ```python
 from py_branches.retry import Retry
 from py_branches.retry import RunUntilFailed
+from py_branches.retry import RunUntilXSuccesses
 from py_branches.timeout import Timeout
 
 # Re-run on FAILURE up to 3 attempts, waiting 0.5s between them
@@ -176,6 +177,9 @@ retried = Retry(child, name="Retry", max_attempts=3, delay=0.5)
 
 # Re-run on SUCCESS until the child fails (SUCCESS), or FAILURE after 100 runs
 repeated = RunUntilFailed(child, name="RunUntilFailed", max_runs=100)
+
+# Re-run until 3 successes in total (SUCCESS), or FAILURE after 10 runs
+collected = RunUntilXSuccesses(child, name="Collect", num_successes=3, max_runs=10)
 
 # FAILURE if the child stays RUNNING for more than 2 seconds
 bounded = Timeout(child, name="Timeout", duration=2.0)

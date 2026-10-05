@@ -8,6 +8,7 @@ import pytest
 from py_branches.clock import ManualClock
 from py_branches.retry import Retry
 from py_branches.retry import RunUntilFailed
+from py_branches.retry import RunUntilXSuccesses
 
 _r = py_trees.common.Status.RUNNING
 _s = py_trees.common.Status.SUCCESS
@@ -358,6 +359,214 @@ def test_run_until_failed_matches_retry_of_inverted_child(succeed_count):
     )
 
     for _ in range(6):
+        loop.tick_once()
+        oracle.tick_once()
+        assert loop.status == oracle.status
+
+
+class ScriptedBehavior(py_trees.behaviour.Behaviour):
+    """
+    Returns the statuses in ``script`` one per call to update(), repeating the
+    last one once the script runs out. Does NOT reset on initialise().
+    """
+
+    def __init__(self, name, script):
+        super().__init__(name=name)
+        self._script = list(script)
+        self._call_count = 0
+
+    def initialise(self):
+        pass  # preserve position across runs
+
+    def update(self):
+        status = self._script[min(self._call_count, len(self._script) - 1)]
+        self._call_count += 1
+        return status
+
+
+def test_run_until_x_successes_all_succeed():
+    """Child always succeeds; SUCCESS on exactly the num_successes-th tick."""
+    child = ScriptedBehavior("child", [_s])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=3, max_runs=5)
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _s
+    assert child._call_count == 3
+
+
+def test_run_until_x_successes_failures_do_not_reset_count():
+    """S F S S reaches three successes in total on run 4."""
+    child = ScriptedBehavior("child", [_s, _f, _s, _s])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=3, max_runs=5)
+
+    for _ in range(3):
+        loop.tick_once()
+        assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _s
+
+
+def test_run_until_x_successes_cap_reached():
+    """Too few successes; FAILURE on exactly the max_runs-th tick."""
+    child = ScriptedBehavior("child", [_s, _f])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=2, max_runs=4)
+
+    for _ in range(3):
+        loop.tick_once()
+        assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _f
+    assert child._call_count == 4
+
+
+def test_run_until_x_successes_uses_every_run_when_target_unreachable():
+    """Two failures make 3-of-4 impossible after run 2, but all runs still happen."""
+    child = ScriptedBehavior("child", [_f, _f, _s, _s])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=3, max_runs=4)
+
+    for _ in range(3):
+        loop.tick_once()
+        assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _f
+    assert child._call_count == 4
+    assert loop._hits == 2
+
+
+def test_run_until_x_successes_num_successes_equals_max_runs():
+    """With no slack, a single failure means FAILURE at the cap."""
+    child = ScriptedBehavior("child", [_s, _f, _s])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=3, max_runs=3)
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _r
+
+    loop.tick_once()
+    assert loop.status == _f
+
+
+def test_run_until_x_successes_resets_on_reinitialise():
+    """Stopping the decorator to INVALID resets both counters."""
+    child = ScriptedBehavior("child", [_f])
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=2, max_runs=3)
+
+    for _ in range(3):
+        loop.tick_once()
+    assert loop.status == _f
+
+    loop.stop(py_trees.common.Status.INVALID)
+    child._script = [_s]
+
+    loop.tick_once()
+    assert loop.status == _r
+    assert loop._attempts == 1
+    assert loop._hits == 1
+
+    loop.tick_once()
+    assert loop.status == _s
+
+
+def test_run_until_x_successes_running_child_passes_through():
+    """If child is RUNNING, the decorator stays RUNNING without counting a run."""
+    running_child = py_trees.behaviours.Running(name="running")
+    loop = RunUntilXSuccesses(running_child, name="loop", num_successes=2, max_runs=3)
+
+    for _ in range(5):
+        loop.tick_once()
+        assert loop.status == _r
+        assert loop._attempts == 0
+        assert loop._hits == 0
+
+
+def test_run_until_x_successes_waits_exactly_delay_on_manual_clock():
+    """The delay applies after a FAILURE as well as after a SUCCESS."""
+    child = ScriptedBehavior("child", [_f, _s, _s])
+    clock = ManualClock()
+    loop = RunUntilXSuccesses(
+        child, name="loop", num_successes=2, max_runs=3, delay=1.0, clock=clock
+    )
+
+    loop.tick_once()  # run 1 fails
+    assert loop.status == _r
+    assert loop._waiting
+
+    clock.advance(0.999)
+    loop.tick_once()
+    assert loop.status == _r
+    assert child._call_count == 1
+
+    clock.advance(0.001)
+    loop.tick_once()  # run 2 succeeds
+    assert loop.status == _r
+    assert child._call_count == 2
+    assert loop._waiting
+
+    clock.advance(0.999)
+    loop.tick_once()
+    assert child._call_count == 2
+
+    clock.advance(0.001)
+    loop.tick_once()  # run 3 succeeds
+    assert loop.status == _s
+    assert child._call_count == 3
+
+
+def test_run_until_x_successes_zero_delay_does_not_wait_on_manual_clock():
+    """delay=0.0 runs back-to-back, no timer."""
+    child = ScriptedBehavior("child", [_s])
+    clock = ManualClock()
+    loop = RunUntilXSuccesses(
+        child, name="loop", num_successes=2, max_runs=2, clock=clock
+    )
+
+    loop.tick_once()
+    assert loop.status == _r
+    assert not loop._waiting
+
+    loop.tick_once()
+    assert loop.status == _s
+    assert clock.time() == 0.0
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"num_successes": 0, "max_runs": 3}, r"num_successes\(0\)"),
+        ({"num_successes": 4, "max_runs": 3}, r"max_runs\(3\) must be at least"),
+        ({"num_successes": 1, "max_runs": 3, "delay": -1.0}, r"delay\(-1.0\)"),
+    ],
+)
+def test_run_until_x_successes_rejects_invalid_arguments(kwargs, message):
+    child = py_trees.behaviours.Success(name="success")
+    with pytest.raises(ValueError, match=message):
+        RunUntilXSuccesses(child, name="loop", **kwargs)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [[_s], [_f], [_f, _s], [_f, _f, _s], [_f, _f, _f, _s], [_f, _s, _f]],
+)
+def test_run_until_x_successes_with_one_success_matches_retry(script):
+    """num_successes=1 is Retry under another name."""
+    child = ScriptedBehavior("child", script)
+    loop = RunUntilXSuccesses(child, name="loop", num_successes=1, max_runs=3)
+
+    oracle_child = ScriptedBehavior("oracle_child", script)
+    oracle = Retry(oracle_child, name="oracle", max_attempts=3)
+
+    for _ in range(5):
         loop.tick_once()
         oracle.tick_once()
         assert loop.status == oracle.status

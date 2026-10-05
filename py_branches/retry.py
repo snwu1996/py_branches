@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Re-run a child behavior, optionally with a delay between runs.
 
-Two decorators that differ only in which outcome means "go again":
-:class:`Retry` re-runs a child that fails, for flaky operations that are worth
-attempting more than once; :class:`RunUntilFailed` re-runs a child that
-succeeds, for work that should repeat until the child reports it is done.
+Three decorators that differ only in what ends the loop: :class:`Retry`
+re-runs a child that fails, for flaky operations that are worth attempting
+more than once; :class:`RunUntilFailed` re-runs a child that succeeds, for
+work that should repeat until the child reports it is done; and
+:class:`RunUntilXSuccesses` re-runs a child until it has succeeded a given
+number of times, for work that needs several good results.
 """
 
 import logging
@@ -17,38 +19,41 @@ from .clock import default_clock
 logger = logging.getLogger(__name__)
 
 
-class _RepeatOnStatus(py_trees.decorators.Decorator):
-    """Base for decorators that re-run their child on one terminal status.
+class _RunUntilCount(py_trees.decorators.Decorator):
+    """Base for decorators that re-run their child until a count is reached.
 
-    Subclasses set :attr:`_repeat_on`. When the child finishes with that
-    status the run is counted and, while under the limit, the child is
-    restarted (after the optional delay); once the limit is reached the
-    decorator reports FAILURE. The child finishing with the other terminal
-    status ends the loop with SUCCESS. It is private: the concrete decorators
-    are the public surface.
+    Every run the child finishes counts against ``max_runs``; runs that end in
+    ``target_status`` also count towards ``target_count``. Reaching
+    ``target_count`` reports SUCCESS, reaching ``max_runs`` first reports
+    FAILURE, and anything else restarts the child (after the optional delay).
+    It is private: the concrete decorators are the public surface.
     """
-
-    _repeat_on: py_trees.common.Status
 
     def __init__(
         self,
         child: py_trees.behaviour.Behaviour,
         name: str,
-        limit: int,
+        target_status: py_trees.common.Status,
+        target_count: int,
+        max_runs: int,
         delay: float,
         *,
         clock: Clock | None = None,
     ):
         super().__init__(name=name, child=child)
-        self._limit = limit
+        self._target_status = target_status
+        self._target_count = target_count
+        self._max_runs = max_runs
         self._delay = delay
         self._clock = clock if clock is not None else default_clock()
         self._attempts = 0
+        self._hits = 0
         self._waiting = False
         self._wait_start: float | None = None
 
     def initialise(self) -> None:
         self._attempts = 0
+        self._hits = 0
         self._waiting = False
         self._wait_start = None
 
@@ -67,28 +72,32 @@ class _RepeatOnStatus(py_trees.decorators.Decorator):
     def update(self) -> py_trees.common.Status:
         if self.decorated.status == py_trees.common.Status.RUNNING:
             return py_trees.common.Status.RUNNING
-        elif self.decorated.status != self._repeat_on:
-            return py_trees.common.Status.SUCCESS
         self._attempts += 1
+        if self.decorated.status == self._target_status:
+            self._hits += 1
         logger.debug(
-            "%s: run %d/%d ended %s",
+            "%s: run %d/%d ended %s (%d/%d %s)",
             self.name,
             self._attempts,
-            self._limit,
-            self._repeat_on.name,
+            self._max_runs,
+            self.decorated.status.name,
+            self._hits,
+            self._target_count,
+            self._target_status.name,
         )
-        if self._attempts < self._limit:
-            if self._delay > 0.0:
-                self._waiting = True
-                self._wait_start = self._clock.time()
-            else:
-                self.decorated.stop(py_trees.common.Status.INVALID)
-            return py_trees.common.Status.RUNNING
-        else:
+        if self._hits == self._target_count:
+            return py_trees.common.Status.SUCCESS
+        elif self._attempts == self._max_runs:
             return py_trees.common.Status.FAILURE
+        if self._delay > 0.0:
+            self._waiting = True
+            self._wait_start = self._clock.time()
+        else:
+            self.decorated.stop(py_trees.common.Status.INVALID)
+        return py_trees.common.Status.RUNNING
 
 
-class Retry(_RepeatOnStatus):
+class Retry(_RunUntilCount):
     """
     Retries a child behavior on FAILURE up to ``max_attempts`` times.
 
@@ -127,8 +136,6 @@ class Retry(_RepeatOnStatus):
             retry = Retry(child, name="RetryWithDelay", max_attempts=3, delay=1.0)
     """
 
-    _repeat_on = py_trees.common.Status.FAILURE
-
     def __init__(
         self,
         child: py_trees.behaviour.Behaviour,
@@ -142,10 +149,18 @@ class Retry(_RepeatOnStatus):
             raise ValueError(f"max_attempts({max_attempts}) must be greater than 0.")
         if delay < 0.0:
             raise ValueError(f"delay({delay}) must be non-negative.")
-        super().__init__(child, name, max_attempts, delay, clock=clock)
+        super().__init__(
+            child,
+            name,
+            py_trees.common.Status.SUCCESS,
+            1,
+            max_attempts,
+            delay,
+            clock=clock,
+        )
 
 
-class RunUntilFailed(_RepeatOnStatus):
+class RunUntilFailed(_RunUntilCount):
     """
     Re-runs a child behavior on SUCCESS until it fails, up to ``max_runs`` times.
 
@@ -187,8 +202,6 @@ class RunUntilFailed(_RepeatOnStatus):
             )
     """
 
-    _repeat_on = py_trees.common.Status.SUCCESS
-
     def __init__(
         self,
         child: py_trees.behaviour.Behaviour,
@@ -202,4 +215,94 @@ class RunUntilFailed(_RepeatOnStatus):
             raise ValueError(f"max_runs({max_runs}) must be greater than 0.")
         if delay < 0.0:
             raise ValueError(f"delay({delay}) must be non-negative.")
-        super().__init__(child, name, max_runs, delay, clock=clock)
+        super().__init__(
+            child,
+            name,
+            py_trees.common.Status.FAILURE,
+            1,
+            max_runs,
+            delay,
+            clock=clock,
+        )
+
+
+class RunUntilXSuccesses(_RunUntilCount):
+    """
+    Re-runs a child behavior until it has succeeded ``num_successes`` times.
+
+    Every run the child finishes, SUCCESS or FAILURE, counts against
+    ``max_runs``. Successes are counted in total, so a FAILURE uses up a run
+    without resetting the success count. Returns SUCCESS on the
+    ``num_successes``-th success, and FAILURE once ``max_runs`` runs have
+    finished without reaching it. There is no early exit: the child keeps
+    running until the cap even after the target has become unreachable. Stays
+    RUNNING between runs (and during the optional delay between them), so the
+    loop spans several ticks rather than blocking inside one.
+
+    Both counters reset in ``initialise()``, so each fresh entry into this
+    decorator starts from zero successes with a full budget of ``max_runs``.
+    With ``num_successes=1`` it behaves exactly like :class:`Retry`.
+
+    Args:
+        child (Behaviour): The child behavior to repeat.
+        name (str): Name of this decorator.
+        num_successes (int): Number of successes needed. Must be at least 1.
+        max_runs (int): Maximum number of times to run the child. Must be at
+            least ``num_successes``.
+        delay (float): Seconds to wait between runs. Must be non-negative.
+            Default 0.0.
+        clock (Clock): Time source for the inter-run delay, keyword-only.
+            Defaults to the real clock; pass a
+            :class:`py_branches.clock.ManualClock` to control it in tests.
+
+    Raises:
+        ValueError: If ``num_successes`` is less than 1, ``max_runs`` is less
+            than ``num_successes``, or ``delay`` is negative.
+
+    Example:
+        .. testcode::
+
+            child = py_trees.behaviours.Success(name="TakeSample")
+            # Collect 3 good samples, giving up after 10 runs.
+            collect = RunUntilXSuccesses(
+                child, name="CollectSamples", num_successes=3, max_runs=10
+            )
+
+            child = py_trees.behaviours.Success(name="TakeSample")
+            # As above, waiting half a second between runs.
+            collect = RunUntilXSuccesses(
+                child,
+                name="CollectSamplesSlowly",
+                num_successes=3,
+                max_runs=10,
+                delay=0.5,
+            )
+    """
+
+    def __init__(
+        self,
+        child: py_trees.behaviour.Behaviour,
+        name: str,
+        num_successes: int,
+        max_runs: int,
+        delay: float = 0.0,
+        *,
+        clock: Clock | None = None,
+    ):
+        if num_successes < 1:
+            raise ValueError(f"num_successes({num_successes}) must be greater than 0.")
+        if max_runs < num_successes:
+            raise ValueError(
+                f"max_runs({max_runs}) must be at least num_successes({num_successes})."
+            )
+        if delay < 0.0:
+            raise ValueError(f"delay({delay}) must be non-negative.")
+        super().__init__(
+            child,
+            name,
+            py_trees.common.Status.SUCCESS,
+            num_successes,
+            max_runs,
+            delay,
+            clock=clock,
+        )
