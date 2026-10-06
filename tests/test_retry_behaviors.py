@@ -718,4 +718,4 @@ def test_run_until_x_successes_accepts_a_delay():
 def test_rerun_decorators_reject_non_delay_values():
     child = py_trees.behaviours.Success(name="success")
     with pytest.raises(TypeError):
-        Retry(child, name="retry", max_attempts=2, delay="1.0")
+        Retry(child, name="retry", max_attempts=2, delay="1.0")  # type: ignore[arg-type]

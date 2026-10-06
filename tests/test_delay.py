@@ -14,7 +14,7 @@ from py_branches.delay import DelayUniform
 from py_branches.delay import as_delay
 
 
-class UntouchableRng:
+class UntouchableRng(random.Random):
     """An rng that fails the test if anything draws from it."""
 
     def uniform(self, a, b):
@@ -24,7 +24,7 @@ class UntouchableRng:
         raise AssertionError("rng was used")
 
 
-class FixedRng:
+class FixedRng(random.Random):
     """uniform() always returns its upper bound."""
 
     def uniform(self, a, b):
