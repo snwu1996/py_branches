@@ -628,14 +628,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         # Re-arm once we've left all windows.
         if matched_idx is None:
             self._last_schedule_idx = None
-            logger.debug("%s: outside every window, no pause", self.name)
             return
 
         # Don't re-pause for the same window we already handled.
         if matched_idx == self._last_schedule_idx:
-            logger.debug(
-                "%s: window %d already handled, no pause", self.name, matched_idx
-            )
             return
 
         self._last_schedule_idx = matched_idx
