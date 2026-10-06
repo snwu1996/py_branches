@@ -38,6 +38,7 @@ from sklearn.neighbors import KernelDensity
 
 from .clock import Clock
 from .clock import default_clock
+from .delay import _truncated_normal
 
 logger = logging.getLogger(__name__)
 
@@ -223,15 +224,14 @@ class PauseNormal(_SampledPause):
         self._rng = rng if rng is not None else random
 
     def _sample(self) -> float:
-        for _ in range(self._max_rejections):
-            t_wait = self._rng.normalvariate(self._mean, self._sigma)
-            if self._min_t <= t_wait <= self._max_t:
-                return t_wait
-        raise ValueError(
-            f"{self.name}: {self._max_rejections} consecutive draws from "
-            + f"normal(mean={self._mean}, sigma={self._sigma}) all fell outside "
-            + f"[min_t({self._min_t}), max_t({self._max_t})]; the distribution "
-            + "and the bounds disagree."
+        return _truncated_normal(
+            self._rng,
+            self._mean,
+            self._sigma,
+            self._min_t,
+            self._max_t,
+            self._max_rejections,
+            self.name,
         )
 
 
@@ -628,14 +628,10 @@ class PauseSchedule(py_trees.behaviour.Behaviour):
         # Re-arm once we've left all windows.
         if matched_idx is None:
             self._last_schedule_idx = None
-            logger.debug("%s: outside every window, no pause", self.name)
             return
 
         # Don't re-pause for the same window we already handled.
         if matched_idx == self._last_schedule_idx:
-            logger.debug(
-                "%s: window %d already handled, no pause", self.name, matched_idx
-            )
             return
 
         self._last_schedule_idx = matched_idx

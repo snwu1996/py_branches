@@ -15,10 +15,13 @@ Module                         What it covers
 :mod:`py_branches.clock`       Injectable time sources, for testable timing
 :mod:`py_branches.cooldown`    Enforcing a minimum gap between runs
 :mod:`py_branches.counter`     Capping the total number of runs
+:mod:`py_branches.delay`       Waits to pass to behaviors: constant, random,
+                               or backing off
 :mod:`py_branches.latch`       Making a first SUCCESS permanent
 :mod:`py_branches.pause`       Waiting: random, sampled, keyboard or scheduled
 :mod:`py_branches.random`      Probabilistic execution and weighted selection
-:mod:`py_branches.retry`       Retrying a failing child
+:mod:`py_branches.retry`       Re-running a child until it succeeds, fails,
+                               or succeeds N times
 :mod:`py_branches.runtime`     Running a tree as a process: pacing,
                                signals, exit codes and teardown
 :mod:`py_branches.surgery`     Editing a tree after it is built: walk, find,
@@ -41,6 +44,7 @@ from . import blackboard
 from . import clock
 from . import cooldown
 from . import counter
+from . import delay
 from . import latch
 from . import pause
 from . import random
@@ -59,6 +63,7 @@ __all__ = [
     "clock",
     "cooldown",
     "counter",
+    "delay",
     "latch",
     "pause",
     "random",
